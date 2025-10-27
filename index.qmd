@@ -1,0 +1,66 @@
+---
+title: |
+  A title goes here
+author:
+  - name: author
+    corresponding: true
+    orcid: 0000-0000-0000-0000
+    email: name@domain.com
+    affiliations:
+      - ref: 1
+    # roles:
+    #   - conceptualization
+    #   - data curation
+    #   - methodology
+    #   - formal analysis
+    #   - writing
+
+affiliations:
+  - id: 1
+    name: University
+    department: Department
+csl: https://www.zotero.org/styles/apa
+keywords: [keywords]
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: none
+knitr:
+  opts_chunk:
+    echo: false
+    cache: true
+    warning: false
+    message: false
+    fig-width: 6
+    fig-asp: 0.618
+    out-width: 80%
+    fig-align: center
+code-links: repo
+format:
+  html:
+    theme:
+      light: united
+      dark: darkly
+    toc: true
+    toc-depth: 2
+    fontsize: 13pt
+  preprint-typst:
+    wordcount: true
+    theme: jou
+    citeproc: true
+    mainfont: "Liberation Serif"
+    sansfont: "Liberation Sans"
+    include-before-body:
+      - text: "#show <refs>: set par(hanging-indent: 1.4em)"
+  docx: default
+
+```{r}
+#| label: libraries
+
+```
+
+```{r}
+#| label: load-data
+
+```
+
