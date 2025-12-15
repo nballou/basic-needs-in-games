@@ -6,6 +6,19 @@
 .Ruserdata
 .DS_Store
 ^~$*
+/.quarto/
+
+# Ignore large downloadable datasets
+/data/open-play*/
+/data/open-play*
+/data/pws/
+ms.qmd
+
+# Ignore cached model fits (reproducible but slow)
+/data/models/
+
+.lintr
+settings.json
 
 # History files
 .Rhistory
@@ -56,3 +69,6 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+**/*.quarto_ipynb
+FORMATTING_GUIDE.md

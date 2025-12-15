@@ -1,0 +1,437 @@
+---
+title: "Determine Required Number of Imputations"
+format: html
+---
+
+Determines optimal number of imputations (M) using von Hippel (2020) protocol.
+
+**Workflow:**
+
+1. Run mice chunk in index.qmd (imputes analytical sample, N~555 with ≥15 waves)
+2. Run this document to calculate FMI from pilot models
+3. Note recommended M from output
+4. Update M_IMPUTATIONS in index.qmd to recommended value
+5. Delete data/imputation_analytical.csv.gz to force re-run with new M
+6. Re-run mice chunk and proceed with main analyses
+
+**Full sample sensitivity (optional):**
+- S8 section in index.qmd has placeholder for full sample imputation
+- Set eval: true in that chunk to run (uses same M as main analysis)
+- Compares analytical vs. full sample approaches
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(glue)
+library(glmmTMB)
+library(mice)
+library(broom.mixed)
+library(lubridate)
+
+set.seed(8675309)
+
+```
+
+## Load Imputation Object
+
+```{r}
+#| label: load-imputation
+
+# Check if imputation object exists in parent environment
+if (!exists("imp", envir = .GlobalEnv)) {
+  stop("Run the mice chunk in index.qmd first")
+}
+
+imp <- get("imp", envir = .GlobalEnv)
+telemetry_vars <- get("telemetry_vars", envir = .GlobalEnv)
+
+message(glue("Loaded imputation object (M = {imp$m})"))
+
+```
+
+## Post-Imputation Centering for Pilot Models
+
+```{r}
+#| label: pilot-centering
+
+# Convert to long format and calculate composite scores from imputed items
+daily_imputed_pilot <- complete(imp, action = "long", include = FALSE) |>
+  pivot_longer(
+    cols = -c(
+      .imp,
+      .id,
+      pid,
+      age,
+      gender,
+      edu_level,
+      employment,
+      marital_status,
+      life_sat_baseline,
+      wemwbs,
+      diaries_completed,
+      self_reported_weekly_play
+    ),
+    names_to = c(".value", "wave"),
+    names_pattern = "(.+)_w(.+)"
+  ) |>
+  mutate(wave = as.factor(wave)) |>
+  # Calculate composite scores from imputed individual items
+  mutate(
+    global_ns = rowMeans(pick(bpnsfs_1, bpnsfs_3, bpnsfs_5), na.rm = TRUE),
+    global_nf = rowMeans(pick(bpnsfs_2, bpnsfs_4, bpnsfs_6), na.rm = TRUE),
+    game_ns = rowMeans(pick(bangs_1, bangs_3, bangs_5), na.rm = TRUE),
+    game_nf = rowMeans(pick(bangs_2, bangs_4, bangs_6), na.rm = TRUE)
+  ) |>
+  # Rejoin telemetry variables
+  left_join(telemetry_vars, by = c("pid", "wave")) |>
+  # Calculate person means within each imputation
+  group_by(.imp, pid) |>
+  mutate(
+    global_ns_pm = mean(global_ns, na.rm = TRUE),
+    global_nf_pm = mean(global_nf, na.rm = TRUE),
+    game_ns_pm = mean(game_ns, na.rm = TRUE),
+    game_nf_pm = mean(game_nf, na.rm = TRUE)
+  ) |>
+  ungroup() |>
+  # Calculate grand means and centered values within each imputation
+  group_by(.imp) |>
+  mutate(
+    global_ns_gm = mean(global_ns_pm, na.rm = TRUE),
+    global_nf_gm = mean(global_nf_pm, na.rm = TRUE),
+    game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
+    game_nf_gm = mean(game_nf_pm, na.rm = TRUE),
+    # Within-person centered
+    global_ns_cw = global_ns - global_ns_pm,
+    global_nf_cw = global_nf - global_nf_pm,
+    game_ns_cw = game_ns - game_ns_pm,
+    game_nf_cw = game_nf - game_nf_pm,
+    # Between-person centered
+    global_ns_cb = global_ns_pm - global_ns_gm,
+    global_nf_cb = global_nf_pm - global_nf_gm,
+    game_ns_cb = game_ns_pm - game_ns_gm,
+    game_nf_cb = game_nf_pm - game_nf_gm
+  ) |>
+  ungroup()
+
+message(glue(
+  "Prepared {length(unique(daily_imputed_pilot$.imp))} imputations for FMI estimation"
+))
+
+```
+
+## Fit Pilot Models
+
+Models include AR(1) and simplified random effects (intercept only for H2) for stable FMI estimates.
+
+```{r}
+#| label: fit-pilot-models
+
+M_INITIAL <- imp$m
+message(glue(
+  "Fitting pilot models (M={M_INITIAL}, may take a few minutes)...\n"
+))
+
+# H1 pilot: Global NS ~ Game NS (with AR1 and random slope)
+h1_pilot_fits <- lapply(1:M_INITIAL, function(i) {
+  if (i %% 5 == 0) {
+    message(glue("  Progress: {i}/{M_INITIAL}"))
+  }
+  dat <- daily_imputed_pilot |> filter(.imp == i)
+  glmmTMB(
+    global_ns ~ game_ns_cw +
+      game_ns_cb +
+      (1 + game_ns_cw | pid) +
+      ar1(wave + 0 | pid),
+    data = dat,
+    REML = TRUE
+  )
+})
+
+# H2 pilot: Played ~ Game NS + Global NF (random intercept only, with AR1)
+h2_pilot_fits <- lapply(1:M_INITIAL, function(i) {
+  if (i %% 5 == 0) {
+    message(glue("  Progress: {i}/{M_INITIAL}"))
+  }
+  dat <- daily_imputed_pilot |> filter(.imp == i)
+  glmmTMB(
+    telemetry_played_any_24h ~ game_ns_cw +
+      game_ns_cb +
+      global_nf_cw +
+      global_nf_cb +
+      (1 | pid) +
+      ar1(wave + 0 | pid),
+    data = dat,
+    family = binomial(link = "logit"),
+    ziformula = ~0
+  )
+})
+
+message("✓ Pilot models fitted")
+
+```
+
+## Calculate FMI Using Rubin's Rules
+
+```{r}
+#| label: calculate-fmi
+
+# Extract tidy results from each model
+h1_tidy_list <- lapply(h1_pilot_fits, tidy, effects = "fixed", conf.int = FALSE)
+h2_tidy_list <- lapply(h2_pilot_fits, tidy, effects = "fixed", conf.int = FALSE)
+
+# Manually calculate pooled estimates and FMI using Rubin's rules
+pool_manual <- function(tidy_list, terms_of_interest) {
+  # Stack all results
+  all_results <- bind_rows(tidy_list, .id = ".imp") |>
+    mutate(.imp = as.integer(.imp)) |>
+    filter(term %in% terms_of_interest)
+
+  # Calculate pooled estimates using Rubin's rules
+  pooled <- all_results |>
+    group_by(term) |>
+    summarise(
+      m = n(),
+      Q_bar = mean(estimate), # Mean of estimates
+      U_bar = mean(std.error^2), # Within-imputation variance
+      B = var(estimate), # Between-imputation variance
+      .groups = "drop"
+    ) |>
+    mutate(
+      T = U_bar + (1 + 1 / m) * B, # Total variance
+      lambda = (B + B / m) / T, # Proportion of variance due to missing data
+      fmi = (B + B / m) / T # Fraction of missing information
+    )
+
+  return(pooled)
+}
+
+# Pool and extract FMI
+h1_pooled <- pool_manual(h1_tidy_list, c("game_ns_cw", "game_ns_cb"))
+h2_pooled <- pool_manual(
+  h2_tidy_list,
+  c("game_ns_cw", "game_ns_cb", "global_nf_cw", "global_nf_cb")
+)
+
+# Extract FMI values
+h1_fmi <- h1_pooled$fmi
+h2_fmi <- h2_pooled$fmi
+
+all_fmi <- c(h1_fmi, h2_fmi)
+max_fmi <- max(all_fmi, na.rm = TRUE)
+
+```
+
+## FMI Results
+
+```{r}
+#| label: fmi-results
+
+# Create results table
+fmi_table <- bind_rows(
+  h1_pooled |> mutate(model = "H1"),
+  h2_pooled |> mutate(model = "H2")
+) |>
+  select(model, term, Q_bar, U_bar, B, fmi) |>
+  arrange(desc(fmi))
+
+message(glue("\nFMI SUMMARY (M={M_INITIAL})\n"))
+
+fmi_table |>
+  mutate(
+    Q_bar = sprintf("%.3f", Q_bar),
+    U_bar = sprintf("%.4f", U_bar),
+    B = sprintf("%.4f", B),
+    fmi = sprintf("%.3f", fmi)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Model",
+      "Parameter",
+      "Estimate",
+      "Within Var",
+      "Between Var",
+      "FMI"
+    ),
+    align = "llrrrr"
+  )
+
+message(glue(
+  "\nMax FMI: {round(max_fmi, 3)} ({fmi_table$model[which.max(all_fmi)]}: {fmi_table$term[which.max(all_fmi)]})"
+))
+
+```
+
+## Diagnostic: High FMI Investigation
+
+```{r}
+#| label: fmi-diagnostics
+
+# Check for anomalously high FMI values
+high_fmi_threshold <- 0.4
+high_fmi_params <- fmi_table |> filter(fmi > high_fmi_threshold)
+
+if (nrow(high_fmi_params) > 0) {
+  message(glue("\n⚠️  HIGH FMI DETECTED\n"))
+
+  for (i in 1:nrow(high_fmi_params)) {
+    param <- high_fmi_params[i, ]
+
+    # Get estimates across imputations
+    if (param$model == "H1") {
+      estimates <- sapply(h1_tidy_list, function(x) {
+        x$estimate[x$term == param$term]
+      })
+      ses <- sapply(h1_tidy_list, function(x) x$std.error[x$term == param$term])
+    } else {
+      estimates <- sapply(h2_tidy_list, function(x) {
+        x$estimate[x$term == param$term]
+      })
+      ses <- sapply(h2_tidy_list, function(x) x$std.error[x$term == param$term])
+    }
+
+    message(glue("\n{param$term} ({param$model}): FMI = {round(param$fmi, 3)}"))
+    message(glue(
+      "  Estimate range: [{round(min(estimates), 3)}, {round(max(estimates), 3)}]"
+    ))
+    message(glue("  Between-imputation SD: {round(sd(estimates), 3)}"))
+    message(glue("  Mean within-imputation SE: {round(mean(ses), 3)}"))
+    message(glue(
+      "  Ratio (between/within): {round(sd(estimates) / mean(ses), 2)}"
+    ))
+  }
+
+  message(
+    "\nLikely cause: Sparse within-person data + imputed outcome variable"
+  )
+}
+
+```
+
+## Visualize FMI
+
+```{r}
+#| label: fmi-plot
+#| fig-width: 8
+#| fig-height: 5
+
+fmi_data <- bind_rows(
+  h1_pooled |> mutate(model = "H1"),
+  h2_pooled |> mutate(model = "H2")
+)
+
+ggplot(fmi_data, aes(x = reorder(term, fmi), y = fmi, fill = model)) +
+  geom_col() +
+  geom_hline(
+    yintercept = 0.5,
+    linetype = "dashed",
+    color = "red",
+    alpha = 0.5
+  ) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::percent,
+    limits = c(0, max(1, max_fmi * 1.1))
+  ) +
+  labs(
+    title = "Fraction of Missing Information (FMI) by Parameter",
+    subtitle = sprintf(
+      "Maximum FMI = %.3f | Initial M = %d",
+      max_fmi,
+      M_INITIAL
+    ),
+    x = NULL,
+    y = "FMI",
+    caption = "Red dashed line shows FMI = 0.5 threshold",
+    fill = "Model"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    plot.title = element_text(face = "bold")
+  )
+
+```
+
+## Required M Calculation
+
+```{r}
+#| label: required-m
+
+# Von Hippel's quadratic rule: M = ceiling(100 * FMI / cv^2), where cv = coefficient of variation
+cv_target <- 0.2
+required_m <- ceiling(100 * max_fmi / cv_target^2)
+
+message(glue("\nREQUIRED M (Von Hippel's rule)\n"))
+message(glue("Target cv: {cv_target} (95% confidence)"))
+message(glue("Max FMI: {round(max_fmi, 3)} → Required M: {required_m}"))
+message(glue("Current M: {M_INITIAL}"))
+
+# Check for anomalously high single FMI
+sorted_fmi <- sort(all_fmi, decreasing = TRUE)
+if (length(sorted_fmi) > 1 && sorted_fmi[1] > 0.4 && sorted_fmi[2] < 0.3) {
+  alt_required_m <- ceiling(100 * sorted_fmi[2] / cv_target^2)
+  message(glue("\n⚠️  Max FMI is anomalously high"))
+  message(glue(
+    "2nd-highest FMI: {round(sorted_fmi[2], 3)} → Alternative M: {alt_required_m}"
+  ))
+}
+
+message(glue("\nRECOMMENDATION\n"))
+
+if (required_m > 200) {
+  message(glue("Formula suggests M = {required_m} (infeasible)"))
+  message("\nHigh FMI reflects sparse within-person game need data")
+  message(glue("Practical recommendation: M = 50-100"))
+  message(glue("Current M = {M_INITIAL} is reasonable - proceed with caution"))
+  message("Report high FMI as limitation in paper")
+} else if (required_m > M_INITIAL) {
+  message(glue("⚠️  Increase to M = {required_m}"))
+} else {
+  message(glue("✓ Current M = {M_INITIAL} is sufficient"))
+}
+
+```
+
+## Required M by Parameter
+
+```{r}
+#| label: summary-table
+
+# Calculate required M for each parameter
+cv_target <- 0.1
+summary_table <- fmi_table |>
+  mutate(
+    Model = model,
+    Parameter = term,
+    Estimate = as.numeric(Q_bar),
+    SE_pooled = sqrt(as.numeric(U_bar) + (1 + 1 / M_INITIAL) * as.numeric(B)),
+    FMI = as.numeric(fmi),
+    Required_M = ceiling(100 * as.numeric(fmi) / cv_target^2)
+  ) |>
+  select(Model, Parameter, Estimate, SE_pooled, FMI, Required_M) |>
+  arrange(desc(Required_M))
+
+summary_table |>
+  knitr::kable(
+    digits = 3,
+    caption = "Required M for each parameter (95% confidence, cv=0.05)"
+  )
+
+message(glue("\nTOP 5 MOST DEMANDING PARAMETERS\n"))
+
+# Show top 5 most demanding parameters
+top5 <- head(summary_table, 5)
+for (i in 1:nrow(top5)) {
+  message(glue(
+    "{i}. {top5$Parameter[i]} ({top5$Model[i]}): FMI={round(top5$FMI[i], 3)} → M={top5$Required_M[i]}"
+  ))
+}
+
+message(glue("\nCurrent M = {M_INITIAL}"))
+message(glue(
+  "Max required = {max(summary_table$Required_M)} ({summary_table$Parameter[which.max(summary_table$Required_M)]} in {summary_table$Model[which.max(summary_table$Required_M)]})"
+))
+
+```

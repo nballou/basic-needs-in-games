@@ -4,6 +4,8 @@ project:
   output-dir: _site
   render:
     - index.qmd
+  preview:
+    watch-inputs: true
 
 execute:
   freeze: auto

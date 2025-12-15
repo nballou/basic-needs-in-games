@@ -1,0 +1,565 @@
+---
+title: "Activity Classification with Ollama"
+format: html
+execute:
+  warning: true
+  message: true
+knitr:
+  opts_chunk:
+    comment: ""
+---
+
+This document classifies free-text activity descriptions into structured categories using a local LLM (Ollama).
+
+## Monitoring Progress
+
+When rendering this document, Quarto buffers output. To see **real-time progress**, open a second terminal and run:
+
+```bash
+tail -f R/categorize_activities/_log/classification_progress.log
+```
+
+This will show live updates as activities are classified.
+
+All classification artifacts are organized in `R/categorize_activities/`:
+- `_cache/` - Quarto cache for expensive operations
+- `_files/` - Rendered output files
+- `_log/` - Real-time progress logs
+
+```{r}
+#| label: libraries
+
+library(tidyverse)
+library(httr2)
+library(jsonlite)
+library(here)
+
+```
+
+## Configuration
+
+```{r}
+#| label: config
+
+# ===== TESTING CONFIGURATION =====
+# Set to NULL to process all activities, or a number to test on a subset
+TEST_SAMPLE_SIZE <- NULL # e.g., 100 for testing, NULL for production
+
+# Output directories
+SCRIPT_DIR <- here::here("R/categorize_activities")
+LOG_DIR <- file.path(SCRIPT_DIR, "_log")
+LOG_FILE <- file.path(LOG_DIR, "classification_progress.log")
+
+# Create directories if they don't exist
+if (!dir.exists(LOG_DIR)) {
+  dir.create(LOG_DIR, recursive = TRUE)
+}
+
+# Category definitions
+CATS <- c(
+  "work_school",
+  "social_engagement",
+  "sleep_eat_fitness",
+  "caretaking",
+  "other_digital_media",
+  "other_leisure",
+  "other"
+)
+
+# Model to use (must be available in Ollama)
+MODEL <- "qwen3:4b-instruct" # or qwen3:8b-instruct / llama3.1:8b-instruct, etc.
+
+# System prompt for the model
+SYSTEM <- paste(
+  "You are a JSON API. Output ONLY valid JSON, no prose.",
+  sprintf("Allowed labels: %s", paste(CATS, collapse = ", ")),
+  sep = "\n"
+)
+
+```
+
+## Helper Functions
+
+```{r}
+#| label: functions
+
+# ----- Prompt builder -----
+mk_prompt <- function(items) {
+  paste0(
+    "Task: Classify each activity into EXACTLY ONE label from:\n",
+    "- work_school\n- social_engagement\n- sleep_eat_fitness\n- caretaking\n- other_digital_media\n- other_leisure\n- other\n\n",
+    "Definitions (BEST single fit):\n",
+    "* work_school: study, classes/homework, meetings/email, coding, research, writing, reports, housework, chores, cleaning.\n",
+    "* social_engagement: DIRECT interaction with people (in-person meetups/visits, phone/video calls, live two-way chat/DM). Includes watching/observing others IN PERSON (e.g., watching partner/friend play games).\n",
+    "* sleep_eat_fitness: ONLY sleep/nap/rest, meals/cooking/eating, exercise/fitness. NO screen media.\n",
+    "* caretaking: caring for or doing activities WITH children/dependents/pets (feeding, bathing, bedtime, diapers, vet, dog walk, playing with kids, reading to kids).\n",
+    "  – Plants/garden care is NOT caretaking.\n",
+    "* other_digital_media: passive/solo screen media. ALL watching screens (TV, movies, shows, YouTube, Netflix, streams). ALL scrolling/browsing. Gaming alone.\n",
+    "* other_leisure: non-digital leisure/creative/hobbies (painting, drawing, board games ALONE, crafts, knitting, gardening, reading books).\n",
+    "* other: errands/misc that don't fit above.\n\n",
+    "CRITICAL RULES:\n",
+    "1) ANY watching screens (TV, videos, streams, Netflix, YouTube) → other_digital_media (NOT sleep_eat_fitness)\n",
+    "2) Watching/observing others IN PERSON (e.g., watching partner play) → social_engagement (NOT other_digital_media)\n",
+    "3) Eating alone/cooking → sleep_eat_fitness\n",
+    "4) Eating with others (social context) → social_engagement\n",
+    "5) Social media scrolling/watching → other_digital_media (unless explicit back-and-forth chat)\n",
+    "6) Household chores/housework/cleaning → work_school (NOT other)\n",
+    "7) Activities WITH children (playing, reading to them, etc.) → caretaking\n",
+    "8) Multiple activities listed (\"X or Y\", \"X and Y\") → classify by FIRST activity mentioned\n",
+    "9) Rationale must describe the SPECIFIC activity, not generic category terms\n",
+    "10) Blank/meaningless → other\n\n",
+    "Return STRICT JSON: {\"labels\":[...],\"rationales\":[...]}, arrays same length as activities; rationale ≤ 12 words.\n\n",
+    "Examples:\n",
+    "• \"Napped\" → sleep_eat_fitness | \"resting/sleeping\"\n",
+    "• \"Watched TV\" → other_digital_media | \"watching television\"\n",
+    "• \"Watched a show\" → other_digital_media | \"watching show/series\"\n",
+    "• \"Watched Netflix\" → other_digital_media | \"streaming video\"\n",
+    "• \"Watched YouTube\" → other_digital_media | \"watching online videos\"\n",
+    "• \"Scrolled TikTok\" → other_digital_media | \"browsing video app\"\n",
+    "• \"Browsed Instagram\" → other_digital_media | \"scrolling social media\"\n",
+    "• \"Ate dinner\" → sleep_eat_fitness | \"eating meal\"\n",
+    "• \"Cooked lunch\" → sleep_eat_fitness | \"preparing meal\"\n",
+    "• \"Dinner with friends\" → social_engagement | \"eating with others\"\n",
+    "• \"Went to gym\" → sleep_eat_fitness | \"exercising\"\n",
+    "• \"Ran 5k\" → sleep_eat_fitness | \"running\"\n",
+    "• \"Video call with mom\" → social_engagement | \"video chatting\"\n",
+    "• \"Texted back and forth\" → social_engagement | \"messaging conversation\"\n",
+    "• \"Walked the dog\" → caretaking | \"caring for pet\"\n",
+    "• \"Fed the cat\" → caretaking | \"feeding pet\"\n",
+    "• \"Painted\" → other_leisure | \"painting\"\n",
+    "• \"Read a book\" → other_leisure | \"reading\"\n",
+    "• \"Gardening\" → other_leisure | \"gardening\"\n",
+    "• \"Did homework\" → work_school | \"completing schoolwork\"\n",
+    "• \"Worked on essay\" → work_school | \"academic writing\"\n",
+    "• \"Did laundry\" → work_school | \"household chores\"\n",
+    "• \"Cleaned room\" → work_school | \"cleaning\"\n",
+    "• \"House work\" → work_school | \"housework\"\n",
+    "• \"Chores\" → work_school | \"household tasks\"\n",
+    "• \"Played board games with kids\" → caretaking | \"playing with children\"\n",
+    "• \"Read to my daughter\" → caretaking | \"reading to child\"\n",
+    "• \"Watched my partner play\" → social_engagement | \"observing partner's activity\"\n",
+    "• \"Working or sleeping\" → work_school | \"working (first activity)\"\n",
+    "• \"Sleep or work\" → sleep_eat_fitness | \"sleeping (first activity)\"\n\n",
+    "Activities:\n",
+    paste0(seq_along(items), '. ', items, collapse = '\n'),
+    "\n\nJSON:"
+  )
+}
+
+# ----- Helper utilities -----
+is_blank <- function(x) is.na(x) | str_trim(x) == ""
+
+# Log message to both console and file
+log_msg <- function(msg, log_file = NULL) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  full_msg <- glue("[{timestamp}] {msg}")
+  message(full_msg)
+  if (!is.null(log_file)) {
+    cat(full_msg, "\n", file = log_file, append = TRUE)
+  }
+}
+
+# Extract the last JSON object, in case the model wraps with prose/fences
+extract_json <- function(txt) {
+  m <- regexpr("\\{[\\s\\S]*\\}\\s*$", txt)
+  if (m[1] != -1) substr(txt, m[1], m[1] + attr(m, "match.length") - 1) else txt
+}
+
+# Pack indices by character budget (prevents overlong prompts) + hard cap items
+pack_indices <- function(texts, max_chars = 3500L, hard_max = 16L) {
+  idxs <- list()
+  start <- 1L
+  n <- length(texts)
+  while (start <= n) {
+    end <- min(n, start + hard_max - 1L)
+    best_end <- start
+    repeat {
+      chars <- nchar(mk_prompt(texts[start:end]), allowNA = FALSE)
+      if (chars > max_chars) {
+        end <- end - 1L
+        if (end < start) {
+          end <- start
+        } # at least one item
+      } else {
+        best_end <- end
+        if (best_end == n || (end - start + 1L) >= hard_max) {
+          break
+        }
+        end <- end + 1L
+      }
+      if (end <= start) break
+    }
+    idxs[[length(idxs) + 1L]] <- start:best_end
+    start <- best_end + 1L
+  }
+  idxs
+}
+
+# Manual retry around httr2 request
+perform_with_retries <- function(req, tries = 4, base_wait = 1) {
+  for (i in seq_len(tries)) {
+    ok <- TRUE
+    resp <- tryCatch(req_perform(req), error = function(e) {
+      ok <<- FALSE
+      e
+    })
+    if (ok) {
+      status <- resp_status(resp)
+      if (status < 400) {
+        return(resp_body_string(resp))
+      } # success
+      if (!status %in% c(429, 500, 502, 503, 504)) {
+        # non-retryable
+        return(resp_body_string(resp))
+      }
+    }
+    if (i < tries) Sys.sleep(base_wait * 2^(i - 1) * runif(1, 0.8, 1.5))
+  }
+  NA_character_
+}
+
+# ----- Main batch classification function -----
+ollama_batch <- function(texts, verbose = TRUE, log_file = NULL) {
+  n <- length(texts)
+  if (n == 0) {
+    return(list(labels = character(0), rationales = character(0)))
+  }
+
+  out_labels <- rep(NA_character_, n)
+  out_rats <- rep(NA_character_, n)
+  idx_chunks <- pack_indices(texts, max_chars = 3500L, hard_max = 16L)
+  processed <- 0L
+
+  # Log start
+  if (!is.null(log_file)) {
+    log_msg(
+      sprintf(
+        "Starting batch classification of %d items in %d chunks",
+        n,
+        length(idx_chunks)
+      ),
+      log_file
+    )
+  }
+
+  for (idx in idx_chunks) {
+    chunk <- texts[idx]
+    blank <- is_blank(chunk)
+    chunk_for_prompt <- chunk
+    chunk_for_prompt[blank] <- ""
+
+    req <- request("http://localhost:11434/api/generate") |>
+      req_body_json(list(
+        model = MODEL,
+        system = SYSTEM,
+        prompt = mk_prompt(chunk_for_prompt),
+        options = list(temperature = 0),
+        format = "json",
+        stream = FALSE
+      )) |>
+      req_timeout(60)
+
+    raw <- perform_with_retries(req, tries = 4, base_wait = 1)
+
+    if (is.na(raw)) {
+      processed <- processed + length(idx)
+      if (verbose) {
+        msg <- glue("[Ollama] {processed}/{n} | batch failed (HTTP)")
+        if (!is.null(log_file)) {
+          log_msg(msg, log_file)
+        } else {
+          message(msg)
+        }
+        flush.console()
+      }
+      next
+    }
+
+    body <- tryCatch(fromJSON(raw)$response, error = function(e) raw)
+    body <- extract_json(body)
+    parsed <- tryCatch(fromJSON(body), error = function(e) NULL)
+
+    labels <- if (!is.null(parsed) && length(parsed$labels) == length(chunk)) {
+      parsed$labels
+    } else {
+      rep(NA_character_, length(chunk))
+    }
+    rats <- if (
+      !is.null(parsed) && length(parsed$rationales) == length(chunk)
+    ) {
+      parsed$rationales
+    } else {
+      rep(NA_character_, length(chunk))
+    }
+
+    # enforce allowed set for non-blanks; blanks remain NA
+    labels[!blank] <- ifelse(labels[!blank] %in% CATS, labels[!blank], "other")
+
+    out_labels[idx] <- labels
+    out_rats[idx] <- rats
+
+    processed <- processed + length(idx)
+    if (verbose) {
+      j <- which(!blank)[1]
+      if (is.na(j)) {
+        j <- 1
+      }
+      pct <- round(100 * processed / n, 1)
+      msg <- glue(
+        "[Ollama] {processed}/{n} ({pct}%) | ",
+        '"{substr(chunk_for_prompt[j], 1, 60)}" → ',
+        "{ifelse(is.na(labels[j]), 'NA', labels[j])}"
+      )
+      if (!is.null(log_file)) {
+        log_msg(msg, log_file)
+      } else {
+        message(msg)
+      }
+      flush.console()
+    }
+  }
+
+  list(labels = out_labels, rationales = out_rats)
+}
+
+```
+
+## Load Data
+
+```{r}
+#| label: load-data
+
+# Set path to data directory
+data_dir <- here::here("data/open-play-v1.0.0")
+daily <- read_csv(
+  file.path(data_dir, "data/clean/survey_daily.csv.gz"),
+  show_col_types = FALSE
+)
+
+# Prepare activities for classification
+activities_to_classify <- daily |>
+  transmute(
+    pid,
+    wave,
+    activity_txt = as.character(displaced_activity)
+  )
+
+# Apply test sampling if configured
+if (!is.null(TEST_SAMPLE_SIZE)) {
+  set.seed(8675309) # for reproducibility
+  activities_to_classify <- activities_to_classify |>
+    slice_sample(n = min(TEST_SAMPLE_SIZE, nrow(activities_to_classify)))
+  cat(sprintf(
+    "\n⚠️  TEST MODE: Sampled %d activities (from %d total)\n",
+    nrow(activities_to_classify),
+    nrow(daily)
+  ))
+} else {
+  cat(sprintf(
+    "\n✓ Loaded %d activities to classify (FULL DATASET)\n",
+    nrow(activities_to_classify)
+  ))
+}
+flush.console()
+
+```
+
+## Classify Activities
+
+This is the expensive operation. Set `cache: true` to avoid re-running if data hasn't changed.
+
+**To test on a subset:** Set `TEST_SAMPLE_SIZE = 100` in the config chunk above.
+**For production:** Set `TEST_SAMPLE_SIZE = NULL` to process all activities.
+
+```{r}
+#| label: classify-activities
+#| cache: true
+#| cache.comments: false
+
+# Initialize log file
+if (file.exists(LOG_FILE)) {
+  file.remove(LOG_FILE)
+}
+log_msg(
+  sprintf(
+    "=== Starting classification of %d activities ===",
+    nrow(activities_to_classify)
+  ),
+  LOG_FILE
+)
+log_msg(sprintf("Model: %s", MODEL), LOG_FILE)
+if (!is.null(TEST_SAMPLE_SIZE)) {
+  log_msg(sprintf("⚠️  TEST MODE: Sample size = %d", TEST_SAMPLE_SIZE), LOG_FILE)
+}
+log_msg(sprintf("Log file: %s", LOG_FILE), LOG_FILE)
+log_msg(sprintf("Monitor progress with: tail -f %s", LOG_FILE), LOG_FILE)
+
+cat("\n")
+cat(sprintf("Classification started at %s\n", Sys.time()))
+cat(sprintf("Monitor progress: tail -f %s\n\n", LOG_FILE))
+flush.console()
+
+# Run classification on all activities
+res <- ollama_batch(activities_to_classify$activity_txt, log_file = LOG_FILE)
+
+log_msg("=== Classification complete! ===", LOG_FILE)
+cat("\n=== Classification complete! ===\n")
+flush.console()
+
+```
+
+## Process and Save Results
+
+```{r}
+#| label: save-results
+
+# Create final output with minimal columns for joining
+activity_categories <- activities_to_classify |>
+  mutate(
+    activity_txt,
+    activity_label = ifelse(is_blank(activity_txt), NA_character_, res$labels),
+    activity_rationale = ifelse(
+      is_blank(activity_txt),
+      NA_character_,
+      res$rationales
+    ),
+    displaced_core_domain = ifelse(
+      is.na(activity_label),
+      NA,
+      activity_label %in%
+        c("work_school", "social_engagement", "sleep_eat_fitness", "caretaking")
+    )
+  ) |>
+  select(
+    pid,
+    wave,
+    activity_txt,
+    activity_label,
+    activity_rationale,
+    displaced_core_domain
+  )
+
+# Save to a compact CSV file
+# Use different filename for test mode to avoid overwriting production data
+if (!is.null(TEST_SAMPLE_SIZE)) {
+  output_path <- here::here("data/activity_categories_TEST.csv")
+  cat(
+    "\n⚠️  TEST MODE: Saving to separate file to avoid overwriting production data\n"
+  )
+} else {
+  output_path <- here::here("data/activity_categories.csv")
+}
+write_csv(activity_categories, output_path)
+
+cat(sprintf(
+  "✓ Successfully processed %d activities\n",
+  nrow(activity_categories)
+))
+cat(sprintf("✓ Saved to: %s\n", output_path))
+flush.console()
+
+```
+
+## Summary Statistics
+
+```{r}
+#| label: summary-stats
+
+cat("\n=== Activity label distribution ===\n")
+activity_categories |>
+  count(activity_label, sort = TRUE) |>
+  mutate(pct = scales::percent(n / sum(n), accuracy = 0.1)) |>
+  knitr::kable()
+
+cat(sprintf(
+  "\n=== Core domain displacement ===\n%d activities (%.1f%%)\n",
+  sum(activity_categories$displaced_core_domain, na.rm = TRUE),
+  100 * mean(activity_categories$displaced_core_domain, na.rm = TRUE)
+))
+
+# Show some example classifications
+cat("\n=== Example classifications ===\n")
+activity_categories |>
+  filter(!is.na(activity_label)) |>
+  slice_sample(n = 10) |>
+  select(activity_label, activity_rationale) |>
+  knitr::kable()
+
+```
+
+## NA Diagnostics
+
+```{r}
+#| label: na-diagnostics
+
+# Add activity text back to see what failed
+activity_with_text <- activities_to_classify |>
+  left_join(
+    activity_categories |>
+      select(pid, wave, activity_label, activity_rationale),
+    by = c("pid", "wave")
+  )
+
+# Check blank vs failed classification
+blank_count <- sum(is_blank(activity_with_text$activity_txt))
+na_label_count <- sum(is.na(activity_with_text$activity_label))
+failed_count <- sum(
+  is.na(activity_with_text$activity_label) &
+    !is_blank(activity_with_text$activity_txt)
+)
+
+cat("\n=== NA Breakdown ===\n")
+cat(sprintf("Total activities: %d\n", nrow(activity_with_text)))
+cat(sprintf(
+  "Blank/empty activities: %d (%.1f%%)\n",
+  blank_count,
+  100 * blank_count / nrow(activity_with_text)
+))
+cat(sprintf(
+  "Activities with NA label: %d (%.1f%%)\n",
+  na_label_count,
+  100 * na_label_count / nrow(activity_with_text)
+))
+cat(sprintf(
+  "Non-blank activities that failed classification: %d (%.1f%%)\n\n",
+  failed_count,
+  100 * failed_count / nrow(activity_with_text)
+))
+
+# Show examples of blank activities
+if (blank_count > 0) {
+  cat("=== Examples of blank/empty activities ===\n")
+  activity_with_text |>
+    filter(is_blank(activity_txt)) |>
+    slice_head(n = 5) |>
+    select(pid, wave, activity_txt) |>
+    knitr::kable()
+}
+
+# Show examples of failed classifications (non-blank but got NA)
+if (failed_count > 0) {
+  cat("\n=== Examples of classification failures (non-blank but got NA) ===\n")
+  activity_with_text |>
+    filter(is.na(activity_label) & !is_blank(activity_txt)) |>
+    slice_head(n = 10) |>
+    select(activity_txt, activity_label, activity_rationale) |>
+    knitr::kable()
+}
+
+```
+
+## Final Notes
+
+```{r}
+#| label: final-notes
+
+# Final reminder if in test mode
+if (!is.null(TEST_SAMPLE_SIZE)) {
+  cat("\n")
+  cat("═══════════════════════════════════════════════════════════════\n")
+  cat("⚠️  TEST MODE WAS ACTIVE - Results are for TESTING ONLY\n")
+  cat("⚠️  To run on full dataset, set TEST_SAMPLE_SIZE = NULL\n")
+  cat("═══════════════════════════════════════════════════════════════\n")
+}
+
+```
