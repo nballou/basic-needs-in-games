@@ -84,7 +84,7 @@ affiliations:
     name: Karolinska Institute
 csl: https://www.zotero.org/styles/apa
 bibliography: references.bib
-keywords: [keywords]
+keywords: [motivation, digital trace data, video games, self-determination theory, displacement, compensatory behaviour]
 editor_options:
   chunk_output_type: console
   markdown:
