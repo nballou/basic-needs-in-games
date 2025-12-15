@@ -1069,7 +1069,7 @@ Playtime, BANG argues, only becomes problematic when it displaces other activiti
 
 *H3. When a person’s most recent gaming displaced a core life domain (work/school, social engagements, sleep/eating/fitness, or caretaking), their global need satisfaction is lower.*
 
-# Study 1
+# Study 1: Preregistered Analysis of Multi-Platform Telemetry and Daily Diaries
 
 Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Registered Report [https://osf.io/65ga3/files/pb5nu](https://osf.io/65ga3/files/pb5nu). All data and analysis code are available on Zenodo (TODO).
 
@@ -1134,7 +1134,7 @@ tibble(
 
 The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.0.0. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, Playstation, Android), and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing.
 
-Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, and played video games for at least 1 hour per week, of which 50% must take place on eligible platforms (Nintendo, Xbox, and Steam). Participants were required to link at least one gaming account from Xbox, Steam, or Nintendo Switch with recent telemetry data (iOS and Android data were collected but are not used in this analysis).
+Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, and played video games for at least 1 hour per week, of which 50% must take place on eligible platforms (Nintendo, Xbox, and Steam). Participants were required to link at least one gaming account from Xbox, Steam, or Nintendo Switch with recent digital trace data (iOS and Android data were collected but are not used in this analysis).
 
 ### Participants
 
@@ -1613,7 +1613,7 @@ The measures used in this paper are visualized in @fig-descriptives and detailed
 
 *Need satisfaction and frustration in daily life*. We measured need satisfaction and frustration in daily life ("global need satisfaction and frustration") during the previous 24 hours using the brief version of the Basic Psychological Need Satisfaction and Frustration Scale [@ChenEtAl2015Basic; @MartelaRyan2024Assessing]. This scale includes 6 items, with one item for need satisfaction and one item for need frustration for each of the three needs. Participants rated each item on a Likert scale from 1 (Strongly disagree) to 7 (Strongly agree). We calculated mean scores for need satisfaction and need frustration by averaging the relevant items. The reliability of the composite need satisfaction index is `r omega_global_ns`, and `r omega_global_nf` for need frustration. As needs are conceptually distinct, we expect lower reliability for this composite index than for unidimensional scales.
 
-*Video game play*. We measured video game play using telemetry data collected from participants' gaming accounts on Xbox, Steam, and Nintendo Switch. During the 30-day study period, we recorded a total of `r hours_nintendo` hours of play on Nintendo Switch, `r hours_xbox` hours on Xbox, and `r hours_steam` hours on Steam. For each daily survey, we calculated total minutes played in the 24-hour period following survey completion. We also created a binary variable indicating whether any play occurred during this period. On average, `r prop_subsequent_play`% of surveys were followed by any play in the subsequent 24 hours, with a mean of `r minutes_subsequent_play` minutes (SD = `r sd_minutes_subsequent_play`).
+*Video game play*. We measured video game play using digital trace data collected from participants' gaming accounts on Xbox, Steam, and Nintendo Switch. During the 30-day study period, we recorded a total of `r hours_nintendo` hours of play on Nintendo Switch, `r hours_xbox` hours on Xbox, and `r hours_steam` hours on Steam. For each daily survey, we calculated total minutes played in the 24-hour period following survey completion. We also created a binary variable indicating whether any play occurred during this period. On average, `r prop_subsequent_play`% of surveys were followed by any play in the subsequent 24 hours, with a mean of `r minutes_subsequent_play` minutes (SD = `r sd_minutes_subsequent_play`).
 
 *Displacement*: We measured displacement of core life domains via an open text field asking participants about the hypothetical alternative activity: "Think back to your most recent gaming session. If you hadn't played a game, what would you most likely have done instead?" With LLM assistance from Qwen3-4b-instruct, we coded participant responses  based on whether they mentioned any of the following activities: work/school responsibilities, social engagements, sleep/eating/fitness, or caretaking---so-called "core life domains". We created a boolean variable indicating whether any core life domain was hypothetically displaced.
 
@@ -1651,7 +1651,7 @@ tibble(
     "Screening sample would be nationally representative by ethnicity and gender",
     "Sample consists of participants aged 18--30",
     "To qualify, >=75% of a participant's total gaming must take place on platforms included in the study (Xbox, Steam, Nintendo Switch)",
-    "Qualification contingent upon valid telemetry within last 7 days",
+    "Qualification contingent upon valid digital trace data within last 7 days",
     "Daily surveys sent at 7pm local time",
     "Data would be imputed for all participants given a 50% overall response rate"
   ),
@@ -1660,7 +1660,7 @@ tibble(
     "Approximately 50% of screening was done using quotas for national representativeness by ethnicity and gender; all subsequent sampling used convenience sampling with no quotas",
     "Sample consists of participants aged 18-40",
     "To qualify, >=50% of a participant's total gaming must take place on platforms included in the study (Xbox, Steam, Nintendo Switch)",
-    "Qualification contingent upon valid telemetry within last 14 days",
+    "Qualification contingent upon valid digital trace data within last 14 days",
     "Daily surveys sent at 2pm local time",
     "Data imputed for only participants with an individual 50% response rate"
   ),
@@ -2775,7 +2775,7 @@ Had we relied solely on self-report measures of play behavior---as most media us
 
 The broader lesson extends beyond SDT. As gaming research matures beyond simple quantity-based approaches [@BallouEtAl2025How], theories must be validated against behavioral outcomes, not just self-reported proxies. Open player behavior data---whether through industry partnerships, player-controlled data sharing infrastructures, or other mechanisms---is essential infrastructure for this work. 
 
-There are, however, practical barriers to making such behavioural evidence routine. Privacy and re-identification risks are non-trivial for high-resolution telemetry, particularly when combined with survey responses, and these risks create understandable reluctance among both participants and data holders. Industry incentives also rarely align with open scientific practices: the most informative behavioural data are often commercially sensitive, operationally costly to extract, and legally complex to share across jurisdictions. Methodologically, the field also lacks shared standards for defining sessions, handling idle time, linking multi-platform identities, and documenting preprocessing decisions—each of which can meaningfully affect substantive conclusions.
+There are, however, practical barriers to making such behavioural evidence routine. Privacy and re-identification risks are non-trivial for high-resolution digital trace data, particularly when combined with survey responses, and these risks create understandable reluctance among both participants and data holders. Industry incentives also rarely align with open scientific practices: the most informative behavioural data are often commercially sensitive, operationally costly to extract, and legally complex to share across jurisdictions. Methodologically, the field also lacks shared standards for defining sessions, handling idle time, linking multi-platform identities, and documenting preprocessing decisions—each of which can meaningfully affect substantive conclusions.
 
 We therefore advocate for multi-platform solutions, mixing both open source and, where possible with high transparency standards, industry collaborations. Multi-platform coverage matters substantively because platform ecosystems structure when and how people play. Different platforms afford different play contexts (e.g., portable vs. fixed-location play, solitary vs. social defaults, friction to launch, and typical session cadence), and these affordances can shift the distribution of sessions across the day and week. When studies observe only a single platform, they risk misclassifying a person’s true “non-play” periods (e.g., apparent disengagement on one platform may simply reflect switching to another), attenuating within-person associations and obscuring displacement dynamics. Single-platform datasets also risk overgeneralizing from idiosyncratic platform cultures and technical constraints (such as background processes, suspend/resume behavior, or account sharing) that can inflate or distort behavioural measures.
 
@@ -2808,6 +2808,9 @@ Together, these limitations suggest that the present findings should be interpre
 ```{=typst}
 #set page(columns: 1)
 ```
+
+::: {#refs}
+:::
 
 # Appendix
 
