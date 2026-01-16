@@ -146,3 +146,58 @@ create_categorical_section <- function(data, var_name, header, levels) {
 
   bind_rows(header_row, level_rows)
 }
+
+# Report within-between estimates with consistent formatting
+report_wb_estimate <- function(pooled_summary, term_cw, term_cb = NULL, accuracy = 0.01) {
+  # Extract day-level estimate with CI
+  day_level_row <- pooled_summary |>
+    filter(term == term_cw)
+
+  if (nrow(day_level_row) == 0) {
+    stop(glue("Term '{term_cw}' not found in pooled summary"))
+  }
+
+  day_level <- day_level_row |>
+    mutate(
+      ci_low = estimate - 1.96 * std.error,
+      ci_high = estimate + 1.96 * std.error,
+      result = glue("{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}]")
+    ) |>
+    pull(result)
+
+  # Optionally extract 30-day aggregate estimate
+  if (!is.null(term_cb)) {
+    aggregate_row <- pooled_summary |>
+      filter(term == term_cb)
+
+    if (nrow(aggregate_row) == 0) {
+      stop(glue("Term '{term_cb}' not found in pooled summary"))
+    }
+
+    aggregate <- aggregate_row |>
+      mutate(
+        ci_low = estimate - 1.96 * std.error,
+        ci_high = estimate + 1.96 * std.error,
+        result = glue("{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}]")
+      ) |>
+      pull(result)
+
+    # Also return just the coefficient for interpretation
+    day_coef <- number(day_level_row$estimate, accuracy)
+    agg_coef <- number(aggregate_row$estimate, accuracy)
+
+    return(list(
+      day_level = day_level,
+      aggregate = aggregate,
+      day_coef = day_coef,
+      agg_coef = agg_coef
+    ))
+  }
+
+  day_coef <- number(day_level_row$estimate, accuracy)
+
+  return(list(
+    day_level = day_level,
+    day_coef = day_coef
+  ))
+}

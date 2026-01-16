@@ -13,4 +13,5 @@ execute:
 repo-url: https://github.com/nballou/basic-needs-in-games
 site-url: https://nballou.github.io/basic-needs-in-games/
 data-url: https://zenodo.org/records/17609160
+code-url: https://example.com
 data-license: CC0
