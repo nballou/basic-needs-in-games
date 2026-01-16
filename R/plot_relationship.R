@@ -22,7 +22,7 @@
 #' @return A ggplot2 object
 #'
 #' @examples
-#' plot_marginal_effects(
+#' plot_relationship(
 #'   model = h1mod,
 #'   x_var = "game_ns_cw",
 #'   x_label = "Need satisfaction in games",
@@ -31,18 +31,19 @@
 #'   within_vars = c("game_ns_cw"),
 #'   between_vars = c("game_ns_cb")
 #' )
-plot_marginal_effects <- function(model,
-                                  x_var,
-                                  x_label,
-                                  y_label,
-                                  color = "blue",
-                                  n_keepers = 50,
-                                  n_points = 101,
-                                  use_person_cb = TRUE,
-                                  cb_value = 0,
-                                  within_vars,
-                                  between_vars) {
-
+plot_relationship <- function(
+  model,
+  x_var,
+  x_label,
+  y_label,
+  color = "blue",
+  n_keepers = 50,
+  n_points = 101,
+  use_person_cb = TRUE,
+  cb_value = 0,
+  within_vars,
+  between_vars
+) {
   # Extract model frame and ensure pid is a factor
   fit_df <- model$frame |> mutate(pid = factor(pid))
 
@@ -54,7 +55,10 @@ plot_marginal_effects <- function(model,
   # Calculate between-person covariates per individual
   pid_cb <- fit_df |>
     group_by(pid) |>
-    summarise(across(all_of(between_vars), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
+    summarise(
+      across(all_of(between_vars), ~ mean(.x, na.rm = TRUE)),
+      .groups = "drop"
+    )
 
   # Select individuals for background based on random slope extremes
   re_pid <- coef(model)$cond$pid |>
@@ -68,11 +72,11 @@ plot_marginal_effects <- function(model,
 
   if (is_binary) {
     # More aggressive filtering: keep only individuals with intercepts
-    # within 0.75 SD of mean to avoid saturation
+    # within 1 SD of mean to avoid saturation
     ri_mean <- mean(re_pid$ri, na.rm = TRUE)
     ri_sd <- sd(re_pid$ri, na.rm = TRUE)
     re_pid <- re_pid |>
-      filter(abs(ri - ri_mean) < 0.75 * ri_sd)
+      filter(abs(ri - ri_mean) < 1 * ri_sd)
   }
 
   # Select by random slope if it exists, otherwise by random intercept
@@ -108,7 +112,7 @@ plot_marginal_effects <- function(model,
   # Set between-person covariates based on use_person_cb
   if (!use_person_cb) {
     nd_ind <- nd_ind |>
-      mutate(across(all_of(between_vars), ~ cb_value))
+      mutate(across(all_of(between_vars), ~cb_value))
   }
 
   # Set non-focal within-person predictors to 0
