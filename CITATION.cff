@@ -1,0 +1,51 @@
+cff-version: 1.2.0
+title: "All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Ballou
+    given-names: Nick
+    orcid: "https://orcid.org/0000-0003-4126-0696"
+    affiliation: "Imperial College London, Dyson School of Design Engineering"
+  - family-names: Földes
+    given-names: Tamás Andrei
+    orcid: "https://orcid.org/0000-0002-0623-9149"
+    affiliation: "University of Oxford, Oxford Internet Institute"
+  - family-names: Vuorre
+    given-names: Matti
+    orcid: "https://orcid.org/0000-0001-5052-066X"
+    affiliation: "Tilburg University, Department of Social Psychology"
+  - family-names: Hakman
+    given-names: Thomas
+    orcid: "https://orcid.org/0009-0009-8292-2482"
+    affiliation: "University of Oxford, Oxford Internet Institute"
+  - family-names: Magnusson
+    given-names: Kristoffer
+    orcid: "https://orcid.org/0000-0003-0713-0556"
+    affiliation: "Karolinska Institute"
+  - family-names: Przybylski
+    given-names: Andrew K
+    orcid: "https://orcid.org/0000-0001-5547-2185"
+    affiliation: "University of Oxford, Oxford Internet Institute"
+abstract: >-
+  Code and materials for 'All BANG, little buck: Need-related experiences
+  are weakly linked with behavior in the video game domain.'
+
+  Contents: Reproducible Quarto manuscript with all analyses; R code for
+  multilevel within-between models, multiple imputation, and visualizations;
+  helper functions for processing multi-platform digital trace data.
+
+  This repository analyzes data from the Open Play dataset
+  (https://doi.org/10.5281/zenodo.17536656), which contains 30 days of daily
+  diary surveys and digital trace data from 555 U.S. players across Xbox,
+  Nintendo Switch, and Steam.
+keywords:
+  - video games
+  - well-being
+  - mental health
+  - trace data
+  - reproducible research
+  - self-determination theory
+license: CC0-1.0
+repository-code: "https://github.com/nballou/basic-needs-in-games"
+url: "https://nballou.github.io/basic-needs-in-games/"
