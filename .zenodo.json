@@ -32,7 +32,7 @@
       "affiliation": "University of Oxford, Oxford Internet Institute"
     }
   ],
-  "description": "Code and materials for 'All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain.'\n\nContents:\n- Reproducible Quarto manuscript with all analyses\n- R code for multilevel within-between models, multiple imputation, and visualizations\n- Helper functions for processing multi-platform digital trace data\n\nData: This repository analyzes data from the Open Play dataset (https://doi.org/10.5281/zenodo.17536656), which contains 30 days of daily diary surveys and digital trace data from 555 U.S. players across Xbox, Nintendo Switch, and Steam.\n\nA browser-readable version of the manuscript is available at https://nballou.github.io/basic-needs-in-games/",
+  "description": "Code and materials for 'All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain.'Contents: Reproducible Quarto manuscript with all analyses, multiple imputation, and visualizations. This repository analyzes data from the Open Play dataset (https://doi.org/10.5281/zenodo.17536656), which contains 30 days of daily diary surveys and digital trace data from 555 U.S. players across Xbox, Nintendo Switch, and Steam. A browser-readable version of the manuscript is available at https://nballou.github.io/basic-needs-in-games/",
   "keywords": [
     "dataset",
     "video games",
