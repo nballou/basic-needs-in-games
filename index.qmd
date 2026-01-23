@@ -1093,7 +1093,7 @@ Playtime, BANG argues, only becomes problematic when it displaces other activiti
 
 # Study 1: Preregistered Analysis of Multi-Platform Digital Trace Data and Daily Surveys
 
-Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Registered Report [@BallouEtAl2025Psychological]. All data and analysis code are available on Zenodo (TODO).
+Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Registered Report [@BallouEtAl2025Psychological]. All data and analysis code are available on Zenodo ({{< meta data-url >}}).
 
 ## Study 1 Method
 
@@ -2878,7 +2878,7 @@ Together, these limitations suggest that the present findings should be interpre
 
 ## Data Availability
 
-All data, materials, and code related to the dataset and this manuscript are available under {{< meta data-license >}} at <https://doi.org/10.5281/zenodo.17536656>.
+All data, materials, and code related to the dataset and this manuscript are available under {{< meta data-license >}} at {{< meta data-url >}}.
 
 ## Funding
 
