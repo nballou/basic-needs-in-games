@@ -1,6 +1,6 @@
 ---
 title: |
-  All BANG, little buck: Need-related experiences are weakly linked with behaviour in the video game domain
+  All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain
 author:
   - name: Nick Ballou
     corresponding: true
@@ -88,7 +88,7 @@ affiliations:
     name: Karolinska Institute
 csl: https://www.zotero.org/styles/apa
 bibliography: references.bib
-keywords: [motivation, digital trace data, video games, self-determination theory, displacement, compensatory behaviour]
+keywords: [motivation, digital trace data, video games, self-determination theory, displacement, compensatory behavior]
 editor_options:
   chunk_output_type: console
   markdown:
@@ -198,12 +198,12 @@ theme_update(
 
 # Define consistent color palette for all visualizations
 colors <- list(
-  game_ns = "#4477AA", # Blue for game need satisfaction
-  global_ns = "#66CCEE", # Cyan for global need satisfaction
+  game_ns = "#009988", # Teal for game need satisfaction
+  global_ns = "#44BB99", # Light teal for global need satisfaction
   global_nf = "#EE6677", # Red for global need frustration
   nintendo = "#E60012", # Nintendo red
   xbox = "#107C10", # Xbox green
-  steam = "#215e8a", # Steam dark
+  steam = "#215e8a", # Steam dark blue
   within = "#228833", # Green for within-person variance
   between = "#BBBBBB" # Gray for between-person variance
 )
@@ -247,8 +247,7 @@ labels <- c(
   "(Intercept)" = "Intercept"
 )
 
-# Load custom plotting functions
-source("R/plot_relationship.R")
+# Load custom functions
 source("R/helpers.R")
 
 ```
@@ -1033,34 +1032,32 @@ imp_mids <- as.mids(daily_imputed)
 
 ---
 abstract: |
-  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behaviour, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study 1 (preregistered) analyzes 11k daily observations from 555 U.S. players with 30 days of multi-platform digital trace data. Study 2 (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction were robustly associated subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta repo-url >}}.
+  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behavior, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study 1 (preregistered) analyzes 11k daily observations from 555 U.S. players with 30 days of multi-platform digital trace data. Study 2 (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction was robustly associated with subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta data-url >}}.
 ---
 
 # Introduction
 
-Digital technology use constitutes one of the domains in which behavior is most directly observable. Digital media (1) are widely used---upwards of half of adults and nearly all children in the UK and US regularly play video games [@EntertainmentSoftwareAssociation20242024; @Ofcom2023Online]; (2) generate digital trace data (automatically logged histories of user behavior), and (3) affect the health of at least some users in important ways, both for better and for worse. These putative impacts of media use behaviour on health are of interest to users, industry professionals, policymakers, clinicians, and families, but research to date has had limited success supporting these groups [@Ballou2023Manifesto]. In large part, this stemming from challenges of accessing granular behavioral data, measuring mental health with sufficient temporal detail, and aligning theory with growing evidence that effects relate primarily to the quality, rather than quantity, of play [@BallouDeterding2024Basic; @Buchi2024Digital; @Orben2022Digital].
+Digital technology use constitutes one of the domains in which behavior is most directly observable. Digital media (1) are widely used---upwards of half of adults and nearly all children in the UK and US regularly play video games [@EntertainmentSoftwareAssociation20242024; @Ofcom2023Online]; (2) generate digital trace data (automatically logged histories of user behavior), and (3) affect the health of at least some users in important ways, both for better and for worse [@GranicEtAl2014benefits; @BallouEtAl2024How]. These putative impacts of media use behavior on health are of interest to users, industry professionals, policymakers, clinicians, and families, but research to date has had limited success supporting these groups [@Ballou2023Manifesto]. Among other difficulties, progress has been stymied by three challenges: (1) accessing granular behavioral data, (2) measuring mental health with sufficient temporal detail, and (3) aligning theory with growing evidence that effects relate primarily to the quality, rather than quantity, of play [@BallouDeterding2024Basic; @Buchi2024Digital; @Orben2022Digital].
 
-Digital trace data—histories of user actions generated when interacting with games—addresses several of these challenges. Compared to self-report, trace data provides greater detail about what, when and how much people play while alleviating concerns about recall biases [@ErnalaEtAl2020How@KahnEtAl2014why; @ParryEtAl2021systematic]. However, three key limitations remain. First, while gaming companies collect player data at scale [@El-NasrEtAl2021Game], these data are rarely accessible to independent researchers. Where access has been negotiated, it typically covers just one game or platform. While single-game studies can offer high depth and detail, they are potentially a small part of a person's gaming diet---UK and US players use an average of 2.8 platforms [@BallouEtAl2025Perceived]. Given this, we advocate for a mix of single-game studies and multi-platform data access to understand holistic effects.
+Digital trace data—histories of user actions generated when interacting with games—addresses several of these challenges. Compared to self-report, trace data provides greater detail about what, when and how much people play while alleviating concerns about recall biases [@ErnalaEtAl2020How; @KahnEtAl2014why; @ParryEtAl2021systematic]. However, three key limitations remain. First, while gaming companies collect player data at scale [@El-NasrEtAl2021Game], these data are rarely accessible to independent researchers. Where access has been negotiated or engineered via open source methods, it typically covers just one game or platform. While single-game studies can offer high depth and detail, they are potentially a small part of a person's gaming diet---engaged UK and US players use an average of 2.8 platforms [@BallouEtAl2025Perceived]. Given this, we advocate for openly available digital trace data spanning both single-game studies and multi-platform data access to understand holistic effects.
 
 Second, while trace data is often richly longitudinal, it has to date only been paired with wellbeing surveys consisting of either a single measurement wave [@BallouEtAl2025Perceived; @JohannesEtAl2021Video] or waves separated by multiple weeks [@LarrieuEtAl2023How; @VuorreEtAl2022Time]. Early evidence suggests gaming effects may materialize and dissipate within 6 hours [@VuorreEtAl2023Affective; @BallouEtAl2025Perceived], and subjective wellbeing varies substantially across a day [@LuhmannEtAl2021Subjective]. Experience sampling and daily diary methods, embraced in social media research [@AalbersEtAl2021Caught; @SiebersEtAl2021Explaining], are needed to capture nuanced, short-lived effects and to better differentiate within- and between-person relationships [@JohannesEtAl2024How].
 
-Third, effects of gaming are likely nuanced and contextual, but existing research lacks strong theoretical frameworks to guide investigation. Studies using digital trace data have ruled out simple playtime--wellbeing relationships [@BallouEtAl2024Registered; @JohannesEtAl2021Video; @VuorreEtAl2022Time; @LarrieuEtAl2023How; @BallouEtAl2025Perceived], supporting calls to move beyond quantity-focused approaches [@BallouEtAl2025How]. To do so, we need theory-driven predictions about how psychological states relate to gaming behavior itself—what motivates people to play in the first place, and how daily fluctuations in wellbeing shape engagement patterns. Self-Determination Theory [SDT, @Ryan2023Oxforda] offers such a framework, proposing that satisfaction of basic psychological needs---autonomy, competence, and relatedness---drives motivated behavior including media use. Understanding whether and when people choose to play games may depend critically on their experiences of needs satisfaction in daily life, yet few studies have tested these behavioral predictions using intensive longitudinal data.
+Third, effects of gaming are likely nuanced and contextual, but existing research lacks strong theoretical frameworks to guide investigation. Studies using digital trace data have ruled out simple playtime--wellbeing relationships [@BallouEtAl2024Registered; @JohannesEtAl2021Video; @VuorreEtAl2022Time; @LarrieuEtAl2023How; @BallouEtAl2025Perceived], supporting calls to move beyond quantity-focused approaches [@BallouEtAl2025How]. To do so, we need theory-driven predictions about how psychological states relate to gaming behavior itself—what motivates people to play in the first place, and how daily fluctuations in wellbeing shape engagement patterns. Self-Determination Theory [SDT, @Ryan2023Oxforda] offers such a framework, proposing that satisfaction of basic psychological needs---autonomy, competence, and relatedness---drives motivated behavior including media use. Understanding whether and when people choose to play games may depend critically on their experiences of needs satisfaction in daily life, yet the majority of studies that have tested these behavioral predictions did so without access to intensive longitudinal data [e.g., @BenderGentile2019internet; @AllenAnderson2018satisfaction].
 
-Together, these gaps point to clear next steps: collect comprehensive multi-platform digital trace data (or, when infeasible, granular records from a single game); pair it with high-resolution, repeated wellbeing measurements; and use this data for theory-driven investigations of play quality and context. These are the aims of the present study.
+Together, these gaps point to clear next steps: collect digital trace data in the form of both comprehensive multi-platform records and single-game, granular interactions; pair it with high-resolution, repeated wellbeing measurements; and use this data for theory-driven investigations of play quality and context. These are the aims of the present study.
 
 # Self-determination theory
 
-Self-determination theory [@RyanDeci2017Selfdetermination] proposes three innate and universal psychological needs: the need for autonomy (to feel in control over one’s life and volitional in one’s actions), competence (to act effectively and exert mastery in the world), and relatedness (to feel that one is valued by others and values them in return). These basic psychological needs are theorized to be direct antecedents of intrinsic and autonomous motivation, as well as vital nutriments required for a person to live a fully functional life. Across the environments we inhabit and activities we perform, these needs can be either satisfied or frustrated [@VansteenkisteEtAl2020basic]. 
+Self-determination theory [@RyanDeci2017Selfdetermination] proposes three innate and universal psychological needs: the need for autonomy (to feel in control over one’s life and volitional in one’s actions), competence (to act effectively and exert mastery in the world), and relatedness (to feel that one is valued by others and values them in return). These basic psychological needs are theorized to be direct antecedents of intrinsic and autonomous motivation, as well as vital nutriments required for a person to live a fully functional life [@Ryan2023Oxford]. Across the environments we inhabit and activities we perform, these needs can be either satisfied or frustrated [@VansteenkisteEtAl2020basic]. 
 
-There has been substantial research into how games and other entertainment media can support basic psychological needs [@PrzybylskiEtAl2010motivational; @TyackMekler2020Selfdetermination]. Games are adept at satisfying all three basic needs; games that better satisfy needs are more engaging; and having one’s needs satisfied during gaming is associated with better mental health outcomes during and after play [@ReerQuandt2020Digital; @TyackMekler2020Selfdetermination; @VellaJohnson2012Flourishing].
-
-A large body of work supports that basic need satisfaction supports intrinsic motivation, and intrinsic motivation translates to higher self-reported behavioral engagement. A subset of this work uses directly observed behavioral outcomes such as actigraph watches to monitor physical activity [@SebireEtAl2013Testing], or proxies for behavioural engagement such as academic and work achievement. 
+There has been substantial research into how games and other entertainment media can support basic psychological needs [@PrzybylskiEtAl2010motivational; @TyackMekler2020Selfdetermination]. Games are adept at satisfying all three basic needs; games that better satisfy needs are more engaging; and having one’s needs satisfied during gaming is associated with better mental health outcomes during and after play [@ReerQuandt2020Digital; @TyackMekler2020Selfdetermination; @VellaJohnson2012Flourishing]. A large body of work supports that basic need satisfaction supports intrinsic motivation, and intrinsic motivation translates to higher self-reported behavioral engagement [@RyanEtAl2022We]. 
 
 ## The Basic Needs in Games (BANG) Model
 
 The Basic Needs in Games (BANG) model of video game play and mental health [@BallouDeterding2024Basic] builds upon the core SDT principle that any action’s impact on mental health is mediated by the extent to which it satisfies or frustrates basic psychological needs. By differentiating between playtime and quality of play, BANG seeks to explain seemingly conflicting earlier findings that playtime itself is largely unrelated to wellbeing, but that some players do experience meaningful benefits or harms from their video game play. 
 
-To date, however, BANG remains largely untested. Hence, the goal of this study is to test several key BANG hypotheses. We label the hypotheses of the current study in numerical order (e.g., H1), but also provide the numbered label from the original paper (e.g., B6) for clarity of potential falsification.
+To date, however, BANG remains largely untested. Hence, the goal of this study is to test several key BANG hypotheses. We label the hypotheses of the current study in numerical order (e.g., H1) but also provide the numbered label from the original paper (e.g., B6) for clarity of potential falsification.
 
 ### The Relationship Between Basic Needs in Games and Global Basic Needs (H1)
 
@@ -1074,16 +1071,15 @@ A positive relationship between need satisfaction in games and overall need sati
 
 Early articulations of SDT propose that goal or activity selection is (intrinsically) motivated by the 'awareness of potential satisfaction' of basic psychological needs or 'expectations about the satisfaction of those [salient] motives' [@DeciRyan1985Intrinsic, p. 231--239]. Need-related outcome expectations are closely related to intrinsic motivation [perhaps even forming part of the computational machinery underlying motivation @MurayamaJach2023critique], and the behavioral product of these expectations is therefore greater behavioral engagement. 
 
-Expectations have, perhaps surprisingly, not featured prominently in subsequent empirical work; most gaming and media use-related SDT work focuses on need satisfaction or frustration as the experiential consequence of media consumption. This can explain loops of self-sustaining activity, but it cannot explain initial selective exposure to gaming where the activity has not commenced. 
+Expectations have, perhaps surprisingly, not featured prominently in subsequent empirical work; most gaming and media use-related SDT work focuses on need satisfaction or frustration as the experiential consequence of media consumption [@BallouDeterding2023Basic]. Need experiences can explain loops of self-sustaining activity, but cannot explain initial selective exposure to gaming where the activity has not commenced. 
 
-BANG proposes that experiences of need satisfaction during a particular gaming session positively affect players' expectations for future need satisfaction with the current game, similar games, and gaming as a whole. 
-Outcome expectations are an important predictor of continued media engagement [@ChangEtAl2014effects; @KocakAlanEtAl2022Replaying; @LaroseEtAl2001Understanding]. Players report that expected need frustration is reported to modulate both initial and continued gaming exposure [@BallouDeterding2023Just]. From BANG (B8), we therefore derive the following hypothesis:
+BANG proposes that experiences of need satisfaction during a particular gaming session positively affect players' expectations for future need satisfaction with the current game, similar games, and gaming as a whole. This prediction is grounded in reports that expected need frustration is reported to modulate both initial and continued gaming exposure [@BallouDeterding2023Just], and in broader findings that outcome expectations are a strong predictor of continued media engagement [@ChangEtAl2014effects; @KocakAlanEtAl2022Replaying; @LaroseEtAl2001Understanding]. From BANG (B8), we therefore derive the following hypothesis:
 
 *H2a. When individuals’ in-game need satisfaction is higher, they are more likely to play video games in the 24-hour period after survey completion.*
 
 ### Compensation (H2b)
 
-SDT predicts that (global) need frustration results in compensatory behavior---people attempt to replenish needs that are not being met by altering their behavior [e.g., @SheldonEtAl2011twoprocess]. The potent need satisfaction offered by games constitute one way for people to compensate [@BallouEtAl2022People], particularly those who are highly engaged with gaming and have high gaming literacy. The so-called "need density hypothesis" predicts that problematic or disordered gaming is most likely to occur when a person experiences high need satisfaction in games and high need frustration in other life domains. In other words, problematic gaming is theorized to occur, at least for some, due to a negative feeedback loop whereby compensation occurs and become maladaptive such that the person's other compensatory tools besides gaming are progressively diminished. Several studies have found support for the need density hypothesis account [@BradtEtAl2024Are; @AllenAnderson2018satisfaction; @MillsEtAl2018exploring]. 
+SDT predicts that (global) need frustration results in compensatory behavior---people attempt to replenish needs that are not being met by altering their behavior [e.g., @SheldonEtAl2011twoprocess]. The potent need satisfaction offered by games constitute one way for people to compensate, particularly those who are highly engaged with gaming and have high gaming literacy [@BallouEtAl2022People]. The so-called "need density hypothesis" predicts that problematic or disordered gaming is most likely to occur when a person experiences high need satisfaction in games and high need frustration in other life domains [@RigbyRyan2011glued]. In other words, problematic gaming is theorized to occur, at least for some, due to a negative feedback loop whereby compensation occurs and becomes maladaptive such that the person's other compensatory tools besides gaming are progressively diminished. Several studies have found support for the need density hypothesis account [@BradtEtAl2024Are; @AllenAnderson2018satisfaction; @MillsEtAl2018exploring]. 
 
 BANG operationalizes this compensatory play via intrinsic motivation. Frustrated needs in one’s life in general make opportunities to fulfill those needs more salient, which---all else equal---manifests phenomenologically as a stronger preference towards activities that satisfy the frustrated need(s). Given this, we hypothesize in the context of our sample of moderately to highly-engaged video game players (derived from BANG Hypothesis 9):
 
@@ -1091,7 +1087,7 @@ BANG operationalizes this compensatory play via intrinsic motivation. Frustrated
 
 ### Displacement (H3)
 
-Playtime, BANG argues, only becomes problematic when it displaces other activitiesessential to the maintenance of need satisfaction in life overall. Commonly proposed problematic displacements are work/school responsibilities [@DrummondSauer2020Timesplitters], personal relationships [@DomahidiEtAl2018Longitudinal], and physical health or sleep. Displacing these essential activities would thereby reduce global need satisfaction.  Thus, BANG (B5) hypothesizes:
+Playtime, BANG argues, only becomes problematic when it displaces other activities essential to the maintenance of need satisfaction in life overall. Commonly proposed problematic displacements are work/school responsibilities [@DrummondSauer2020Timesplitters], personal relationships [@DomahidiEtAl2018Longitudinal], and physical health or sleep [@KingEtAl2013impact]. Displacing these essential activities would thereby reduce global need satisfaction. Thus, BANG (B5) hypothesizes:
 
 *H3. When a person’s most recent gaming is reported to displace a core life domain (work/school, social engagements, sleep/eating/fitness, or caretaking), their global need satisfaction is lower.*
 
@@ -1158,7 +1154,7 @@ tibble(
 
 ### Design
 
-The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.0.0. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, iOS, Android) and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing.
+The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.0.0. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, iOS, Android) and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing. Daily data was collected between Oct 2024 and Aug 2025. 
 
 Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, self-reported playing video games for at least 1 hour per week, of which 50% must take place on eligible platforms (Nintendo, Xbox, and Steam), and successfully linked at least one gaming account on Xbox, Steam, and/or Nintendo Switch with validated recent digital trace data. iOS and Android data were collected but are not used in this analysis. For full details of the recruitment procedures and study methodology, see [@BallouEtAl2025Open].
 
@@ -1647,13 +1643,13 @@ The measures used in this paper are visualized in @fig-descriptives and detailed
 
 *Need satisfaction and frustration in daily life*. We measured need satisfaction and frustration in daily life ("global need satisfaction and frustration") during the previous 24 hours using the brief version of the Basic Psychological Need Satisfaction and Frustration Scale [@ChenEtAl2015Basic; @MartelaRyan2024Assessing]. This scale includes 6 items, with one item for need satisfaction and one item for need frustration for each of the three needs (e.g., "Today ... I was able to do things that I really want and value in life"). Participants rated each item on a Likert scale from 1 (Strongly disagree) to 7 (Strongly agree). We calculated mean scores for need satisfaction and need frustration by averaging the relevant items. Reliability of the composite 3-item need satisfaction index was assessed using McDonald’s omega total ($\omega_t$ = `r omega_global_ns` for need satisfaction; $\omega_t$ = `r omega_global_nf` for need frustration). As needs are conceptually distinct, we expect lower reliability for this composite index than for unidimensional scales.
 
-*Video game play*. We measured video game play using digital trace data collected from participants' gaming accounts on Xbox, Steam, and Nintendo Switch. During the 30-day study period, we recorded a total of `r hours_nintendo` hours of play on Nintendo Switch, `r hours_xbox` hours on Xbox, and `r hours_steam` hours on Steam. For each daily survey, we calculated total minutes played in the 24-hour period following survey completion. We also created a binary variable indicating whether any play occurred during this period. On average, `r prop_subsequent_play`% of surveys were followed by any play in the subsequent 24 hours, with a mean of `r minutes_subsequent_play` minutes (SD = `r sd_minutes_subsequent_play`).
+*Video game playtime*. We measured video game playtime using digital trace data collected from participants' gaming accounts on Xbox, Steam, and Nintendo Switch. During the 30-day study period, we recorded a total of `r hours_nintendo` hours of play on Nintendo Switch, `r hours_xbox` hours on Xbox, and `r hours_steam` hours on Steam. For each daily survey, we calculated total minutes played in the 24-hour period following survey completion. We also created a binary variable indicating whether any play occurred during this period. On average, `r prop_subsequent_play`% of surveys were followed by any play in the subsequent 24 hours, with a mean of `r minutes_subsequent_play` minutes (SD = `r sd_minutes_subsequent_play`).
 
-*Displacement*: We measured displacement of core life domains via an open text field asking participants about the hypothetical alternative activity: "Think back to your most recent gaming session. If you hadn't played a game, what would you most likely have done instead?" With LLM assistance from Qwen3-4b-instruct, we coded participant responses based on whether they mentioned any of the following activities: work/school responsibilities, social engagements, sleep/eating/fitness, or caretaking---so-called "core life domains". We refined the LLM prompt through 5 iterations of manual verification of the 100 random coded responses. We created a boolean variable indicating whether any core life domain was hypothetically displaced. Full materials are provided in the supplement, including the exact LLM prompt used for classification, all raw participant responses, coded outputs, manual verification results, and reproducible code.
+*Displacement*: We measured displacement of core life domains via an open text field asking participants about the hypothetical alternative activity: "Think back to your most recent gaming session. If you hadn't played a game, what would you most likely have done instead?" With LLM assistance from Qwen3-4b-instruct [@qwen3technicalreport], we coded participant responses based on whether they mentioned any of the following activities: work/school responsibilities, social engagements, sleep/eating/fitness, or caretaking---so-called "core life domains". We refined the LLM prompt through 5 iterations of manual verification of the 100 random coded responses. We created a boolean variable indicating whether any core life domain was hypothetically displaced. Full materials are provided in the supplement, including the exact LLM prompt used for classification, all raw participant responses, coded outputs, manual verification results, and reproducible code.
 
 ### Analysis Approach
 
-We tested each hypothesis using multilevel within-between regression models with `glmmTMB` [@BrooksEtAl2017glmmTMB]. Focal predictors were within-person mean-centered, with 30-day person means included to separate day-level from 30-day aggregate associations. All models included random intercepts and AR(1) autocorrelation structures; H1 and H3 additionally included random slopes for day-level predictors, while H2 used random intercepts only due to convergence issues with the binary outcome. No demographic covariates were included, as the within-between specification controls for all time-invariant individual differences.
+We tested each hypothesis using multilevel within-between regression models estimated with `glmmTMB` [@BrooksEtAl2017glmmTMB]. Focal predictors were within-person mean-centered, with 30-day person means included to separate day-level from 30-day aggregate associations. All models included random intercepts and AR(1) autocorrelation structures; H1 and H3 additionally included random slopes for day-level predictors, while H2 used random intercepts only due to convergence issues with the binary outcome. No demographic covariates were included, as the within-between specification controls for all time-invariant individual differences.
 
 This approach isolates day-to-day dynamics: day-level coefficients estimate how much a person's outcome deviates from their own 30-day average when their predictor deviates from their own 30-day average. For example, H1's day-level coefficient answers: 'On days when individuals experience better game need satisfaction than their typical level, do they report higher global need satisfaction than their typical level?' The non-focal 30-day aggregate coefficients capture whether people with generally higher predictor levels also have generally higher outcomes across the study period. Random effects account for stable individual differences (e.g., personality, gaming preferences), and the AR(1) term models temporal autocorrelation in daily data. This specification does not adjust for time-varying confounds; estimates should be interpreted as associations rather than causal effects.
 
@@ -1665,7 +1661,7 @@ Following the two-stage protocol from @VonHippel2020How based on fraction of mis
 
 ### Deviations from Preregistration
 
-We made several deviations from our preregistration to ensure we could recruit enough high-quality participants to meet our sample size goals. In our view, none are so severe enough to threaten the validity of the study. Deviations are summarised in @tbl-deviations.
+We made several deviations from our preregistration to ensure we could recruit enough high-quality participants to meet our sample size goals. In our view, none are so severe enough to threaten the validity of the study. Deviations are summarized in @tbl-deviations.
 
 ::: {.place arguments='top, scope: "parent", float: true'}
 
@@ -1854,6 +1850,8 @@ h1_results <- h1_summary |>
   )
 ```
 
+::: {.place arguments='top, scope: "parent", float: true'}
+
 ```{r}
 #| label: fig-h1-predictions
 #| fig-cap: "Estimated global need satisfaction as a function of need satisfaction in games. Individual trajectories shown as gray lines, population-level association shown as blue line with 95% confidence ribbon."
@@ -1871,6 +1869,8 @@ plot_relationship(
 )
 
 ```
+
+:::
 
 Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (β = `r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
 
@@ -2062,16 +2062,6 @@ recalculateResiduals(sim_resid, group = h2mod$frame$pid) |>
   plot(main = "Residuals by individual")
 ```
 
-```{r}
-#| label: tbl-h2-results
-#| include: false
-#| code-summary: "Show code (H2 results - now in combined table)"
-
-# Results now shown in combined table (tbl-main-results)
-# This chunk kept for any inline reporting references
-```
-
-
 ::: {.place arguments='top, scope: "parent", float: true'}
 
 ```{r}
@@ -2118,20 +2108,20 @@ We tested H2a and H2b using a single multilevel within-between logistic regressi
 
 Results support neither H2a or H2b: at the day level, experiencing neither 1 point higher game need satisfaction (β = `r h2a_day_est`) nor 1 point higher global need frustration (β = `r h2b_day_est`) than usual on a 1-point scale showed meaningful associations with the likelihood of subsequent play (see @fig-h2-predictions). 
 
-We conducted a wide range of sensitivity analyses providing convergent conclusions: key estimates for gaming need satisfaction and global need frustration remain indistinguishable from 0 in models that:
+We conducted a wide range of sensitivity analyses providing convergent conclusions: key estimates for gaming need satisfaction (game NS) and global need frustration (global NF) remain indistinguishable from 0 in models that:
 
-- use subsequent 6 or 12 hours as the outcome, instead of 24 hours (Sensitivity Analysis 1)
-- use alternative random slopes specifications (Sensitivity Analysis 2)
-- use a count model of minutes played in the subsequent 24 hours instead of binary play/no-play (Sensitivity Analysis 3)
-- use complete case data instead of imputed data (Sensitivity Analysis 4),
-- impute data from the full eligible sample instead of the analytic sample (Sensitivity Analysis 5)
-- include an interaction between gaming need satisfaction and global need frustration (Sensitivity Analysis 6)
+- use subsequent 6 hours (game NS: β = 0.04; global NF: β = -0.01) or 12 hours (game NS: β = 0.04; global NF: β = -0.02) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
+- use alternative random slopes specifications (game NS: β = 0.04; global NF: β = -0.06) (Sensitivity Analysis 2)
+- use a count model of minutes played in the subsequent 24 hours instead of binary play/no-play (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 3)
+- use complete case data instead of imputed data (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 4)
+- impute data from the full eligible sample instead of the analytic sample (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 5)
+- include an interaction between gaming need satisfaction and global need frustration (game NS: β = 0.04; global NF: β = -0.08; game NS * global NF: β = 0.04) (Sensitivity Analysis 6)
 - use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 7)
 - enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 8)
 
 The 30-day aggregate associations (game need satisfaction: β = `r h2a_agg_est`; global need frustration: β = `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics. 
 
-In short, results consistently fail to detect an association between situational need satisfaction or global need frustration and subsequent play behaviour.
+In short, results consistently fail to detect an association between situational need satisfaction or global need frustration and subsequent play behavior.
 
 ### H3. When gaming displaces a core life domain, global need satisfaction will be lower
 
@@ -2612,7 +2602,7 @@ pws_n_sessions_fmt <- scales::comma(pws_n_sessions)
 
 ## Study 2 Method
 
-To assess whether our findings generalize beyond the Open Play dataset, we conducted a secondary analysis of data from *PowerWash Simulator* (PWS) [@VuorreEtAl2023intensivea]. PWS is a first-person simulation game where players use pressure washers to clean various objects. Players were prompted during gameplay to rate their experiences of autonomy, competence, focus, wellbeing, immersion, and enjoyment on 0-100 scales. We linked these ratings to objective play behavior extracted from game logs.
+To assess whether our findings generalize beyond the Open Play dataset, we conducted a secondary analysis of data from *PowerWash Simulator* (PWS) [@VuorreEtAl2023intensivea]. PWS is a first-person simulation game where players use pressure washers to clean various objects. The PWS dataset complements the Open Play data because it is highly granular: players were prompted during gameplay to rate their experiences of autonomy, competence, focus, wellbeing, immersion, and enjoyment on 0-100 scales, on average once every 10 minutes throughout a play session. We linked these ratings to play behavior extracted from game logs.
 
 The original study procedures were granted ethical approval by Oxford University’s Central University Research Ethics Committee (SSH_OII_CIA_21_011).
 
@@ -2826,67 +2816,65 @@ p_m1 +
 
 Results are shown in @fig-study2-results. At the session level, game need satisfaction showed a very weak association with session length (β = `r pws_m1_est`). Panel A illustrates that when players experienced higher need satisfaction than their personal average, they did not play meaningfully longer: if a player who typically reported need satisfaction of 1 instead reported a 10, their expected change in session length would be only `r pws_m1_max_eff`.
 
-Similarly, game need satisfaction showed a weak association with time to next session (β = `r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 10, their next session would begin just `r pws_m2_max_eff` sooner than usual. While this association reached statistical significance, given that typical session-to-session deviations in need satisfaction are much smaller (within-person SD = `r game_ns_sd` points), we interpret the practical relevance to behavior as minimal.
+Similarly, game need satisfaction showed a weak association with time to next session (β = `r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 10, their next session would begin `r pws_m2_max_eff` sooner than usual. While this association is significant, given that typical session-to-session deviations in need satisfaction are much smaller (within-person SD = `r game_ns_sd` points), we interpret the practical relevance to behavior as small. It remains an open question how these motivational factors may influence collective human behavior on the games or games platform levels of analysis.
 
 Broadly, results therefore converge with Study 1: Despite examining `r pws_n_sessions_fmt` sessions from `r pws_n_players_fmt` players in a different game using different measures, the pattern of weak behavioral associations replicated. Full model outputs are provided in the Appendix (@tbl-full-study2).
 
 # Discussion
 
-Across Study 1 and Study 2, our findings reveal a consistent pattern: basic psychological needs---whether satisfied in games or frustrated in daily life---show weak or null relationships with subsequent gaming behavior. This stands in contrast to the substantial body of literature linking need satisfaction to self-reported outcomes like enjoyment, continued play intentions, and wellbeing [@TyackMekler2020Selfdetermination]. 
+Across Study 1 and Study 2, our findings reveal a consistent pattern: basic psychological needs---whether satisfied in games or frustrated in daily life---show weak or null relationships with subsequent gaming behavior. This apparent disconnect between self-reported and behavioral outcomes has important implications. Self-determination theory, particularly as applied to games, has been extensively validated using self-report measures. Players who report higher need satisfaction also report greater enjoyment, stronger intentions to continue playing, and better wellbeing outcomes [@TyackMekler2020Selfdetermination]; @AdinolfTurkay2019differences; @OliverEtAl2016video; @TamboriniEtAl2011Media; @FormosaEtAl2022Need; @TyackEtAl2020Restorative]. Our results do not challenge these relationships. Rather, they suggest that for individual players, the pathway from needs to actual behavior may be substantially weaker or more complex than the pathway from needs to self-reported experiences and intentions.
 
-This disconnect between self-reported and behavioral outcomes has important implications. Self-determination theory, particularly as applied to games, has been extensively validated using self-report measures. Players who report higher need satisfaction also report greater enjoyment, stronger intentions to continue playing, and better wellbeing outcomes [@AdinolfTurkay2019differences; @OliverEtAl2016video; @TamboriniEtAl2011Media; @FormosaEtAl2022Need; @TyackEtAl2020Restorative]. Our results do not challenge these relationships. Rather, they suggest that the pathway from needs to actual behavior may be substantially weaker or more complex than the pathway from needs to self-reported experiences and intentions.
-
-Our findings are not the first to find weak links between basic needs and gaming engagement as measured by digital trace data. Motivation was only very weakly associated with total engagement in *League of Legends* [@BruhlmannEtAl2020Motivational]. Competence satisfaction did not meaningfully relate to voluntary engagement in a custom RPG [@KaoEtAl2024How], and satisfaction of all three needs was only very weakly related to playtime in Animal Crossing: New Horizons and Plants vs Zombies: Battle for Neighborville over a 2-week timescale (r = .07, likely too weak to be practically significant) [@JohannesEtAl2021Video]. We suggest several paths forward. 
+Our findings are not the first to report weak links between basic needs and gaming engagement as measured by digital trace data. Motivation was only very weakly associated with total engagement in *League of Legends* [@BruhlmannEtAl2020Motivational]. Competence satisfaction did not meaningfully relate to voluntary engagement in a custom RPG [@KaoEtAl2024How], and satisfaction of all three needs was only very weakly related to playtime in Animal Crossing: New Horizons and Plants vs Zombies: Battle for Neighborville over a 2-week timescale (r = .07, likely too small to be practically significant) [@JohannesEtAl2021Video]. We add to these findings with more comprehensive trace data (spanning 5 platforms in Study 1 and detailed single-game records in Study 2) and higher-frequency wellbeing data. Given accumulating weak links between needs and behavior, we suggest several paths forward.
 
 ## Implications for the BANG model
 
-Only one of BANG's predictions was supported (H1/B6: game needs → global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly: neither in-game positive experiences nor deficits in life in general meaningfully related to subsequent play, and self-reported displacement was negligibly related to wellbeing. All in all, BANG hypotheses B5, B8, and B9 were unsupported in our data.
+Only one of BANG's predictions was supported (H1/B6: game needs are positively associated with global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly: neither in-game positive experiences nor deficits in life in general meaningfully related to subsequent play, and self-reported displacement was negligibly related to wellbeing. All in all, BANG hypotheses B5, B8, and B9 were unsupported in our data.
 
-Null results for theoretical predictions can generally be attributed to (1) lack of statistical power, (2) validity issues (e.g., poor design, poor measures), (3) incorrect auxiliary hypotheses, or (4) theory failure [@Meehl1990Why]. We argue that our study is reasonably well-powered [see @BallouEtAl2025Psychological for simulated sensitivity analyses], and with the exception of H3 whose "hypothetical displacement" measure has obvious flaws (see Limitations), uses valid measures---in particular, because we observe real-world behaviour.
+Null results for theoretical predictions can generally be attributed to (1) lack of statistical power, (2) validity issues (e.g., poor design, poor measures), (3) incorrect auxiliary hypotheses, or (4) theory failure [@Meehl1990Why]. We argue that our study is reasonably well-powered [see @BallouEtAl2025Psychological for simulated sensitivity analyses], and with the exception of H3 whose "hypothetical displacement" measure has obvious flaws (see Limitations), uses valid measures---in particular, because we observe real-world behavior.
 
 We endeavored to test one of the most prominent auxiliary hypotheses present, namely the auxiliary of correct timescale, by comparing 6-hour, 12-hour, and 24-hour time periods, and by triangulating using the PowerWash Simulator dataset, wherein need-related experiences are captured within the session itself. However, none were able to find meaningful support for the behavioral predictions. 
 
 We therefore interpret our results as evidence against certain BANG predictions, necessitating model updating. From a metascientific perspective, model updating after falsification is central to iterative model calibration  and theory modulation [@Meehl1990Why], in which constructs are sharpened, measurement improved, and boundary conditions more precisely articulated. Updating BANG requires identifying *when* and *why* need-related processes do and do not relate to behavioral engagement. 
 
-A wholesale revision of BANG is beyond the scope of the current paper, but our results suggest follow-up investigation should be limited to targeted probes aimed at determining whether the null results here reflect (i) temporal misalignment (for example, it may be that need satisfaction updates expectations much more gradually); (ii) boundary conditions (for example, if where need--behaviour links emerge only for specific players, games, or contexts with low constraint and weak habitual control); or (iii) competing processes (for example, if habits, reinforcement histories, and situational affordances dominate short-term behaviour, leaving needs to shape preferences rather than actions). Critically, if behavioural effects remain absent under conditions designed to maximise their detectability, BANG’s behavioural claims should be revised or removed rather than further insulated.
+A wholesale revision of BANG is beyond the scope of the current paper, but our results suggest follow-up investigation should be limited to targeted probes aimed at determining whether the null results here reflect (i) temporal misalignment ,for example, it may be that need satisfaction updates expectations on a timescale longer than 24 hours, @BallouDeterding2023Just]; (ii) boundary conditions (for example, if need--behavior links emerge only for specific players, games, or contexts with low constraint and weak habitual control); or (iii) competing processes (for example, if habits, reinforcement histories, and situational affordances dominate short-term behavior, leaving needs to shape preferences rather than actions). Critically, if behavioral effects remain absent under conditions designed to maximise their detectability, BANG’s behavioral claims should be revised or removed rather than further insulated.
 
-## Alternative behavioural frameworks
+## Alternative behavioral frameworks
 
-The weak associations between need experiences and subsequent play behaviour suggest that basic psychological needs may not be the primary drivers of short-term gaming engagement. In light of this, we suggest player experience research consider other theoretical frameworks that might provide better or complementary explanations for short-term gaming engagement. We are aware of least three such frameworks.  
+The modest associations we found between need experiences and subsequent play behavior suggest that basic psychological needs may not be the primary drivers of short-term gaming engagement. In light of this, we suggest player experience research consider other theoretical frameworks that might provide better or complementary explanations for short-term gaming engagement. We are aware of least three such frameworks.  
 
-Behaviourist and reinforcement-learning accounts emphasise the power of recent rewards and environmental cues, rather than subjective motives, in sustaining behaviour [@Skinner1965Science; @Niv2009Reinforcement]. Recent work has expanded and adapted these predictions for the digital media domain [@NorwoodPrzybylski2025new; @JamesTunney2017relationship; @JamesTunney2017need]. Under such models, a primary cause of players re-engaging is that the behaviour has been reliably reinforced, not because they recently felt more autonomy, competence, or relatedness. 
+Behaviorist and reinforcement-learning accounts emphasize the power of recent rewards and environmental cues, rather than subjective motives, in sustaining behavior [@Skinner1965Science; @Niv2009Reinforcement]. Recent work has expanded and adapted these predictions for the digital media domain [@NorwoodPrzybylski2025new; @JamesTunney2017relationship; @JamesTunney2017need]. Under such models, a primary cause of players re-engaging is that the behavior has been reliably reinforced, not because they recently felt more autonomy, competence, or relatedness. 
 
-Habit theory similarly predicts minimal coupling between momentary experiences and action. With sufficient repetition in stable contexts, gaming becomes cue-triggered and automatic, guided by procedural memory rather than conscious motivational states [@OuelletteWood1998Habit; @WoodRunger2016Psychology]. If players typically launch games at particular times or in response to specific cues, need fluctuations may exert little incremental influence over behaviour.
+Habit theory similarly predicts minimal coupling between momentary experiences and action. With sufficient repetition in stable contexts, gaming becomes cue-triggered and automatic, guided by procedural memory rather than conscious motivational states [@OuelletteWood1998Habit; @WoodRunger2016Psychology]. If players typically launch games at particular times or in response to specific cues, need fluctuations may exert little incremental influence over behavior.
 
-A third possibility is regulatory cessation. In homeostatic and cybernetic models, behaviour is energized by need- or goal-discrepancies and should weaken once these are reduced; highly satisfying engagement may therefore decrease the likelihood of immediate re-engagement [@Hull1943Principles; @Toates1986Motivational; @CarverScheier2001selfregulation]. Self-determination theory explicitly rejects this logic for psychological needs, arguing that need satisfaction does not produce satiation or motivational decline and may instead sustain intrinsic motivation [@SheldonGunz2009psychological]. However, SDT evidence has primarily relied on self-reported motivation rather than observed behavioural continuation, potentially obscuring homeostatic or satiation-like dynamics that operate at the level of action. In games research, where engagement unfolds as repeated consumption, such regulatory processes may better account for short-term disengagement following highly satisfying play episodes.
+A third possibility is regulatory cessation. In homeostatic and cybernetic models, behavior is energized by need- or goal-discrepancies and should weaken once these are reduced; highly satisfying engagement may therefore decrease the likelihood of immediate re-engagement [@Hull1943Principles; @Toates1986Motivational; @CarverScheier2001selfregulation]. Self-determination theory explicitly rejects this logic for psychological needs, arguing that need satisfaction does not produce satiation or motivational decline and may instead sustain intrinsic motivation [@SheldonGunz2009psychological]. However, SDT evidence has primarily relied on self-reported motivation rather than observed behavioral continuation, potentially obscuring homeostatic or satiation-like dynamics that operate at the level of action. In games research, where engagement unfolds as repeated consumption, such regulatory processes may better account for short-term disengagement following highly satisfying play episodes.
 
-Each of these perspectives aligns with broader evidence that subjective intentions and experiences often predict real-world actions only weakly because behaviour is multiply determined and heavily constrained by situational affordances [@SheeranWebb2016Intention]. For researchers, our findings therefore suggest that comprehensive models of gaming behaviour may need to incorporate reinforcement histories, habits, and regulatory processes alongside need-based motivations. For game developers, they suggest that relying on experiential metrics (e.g., 'fun', satisfaction surveys) may provide an incomplete picture of what sustains engagement. For parents and clinicians, they suggest that efforts to promote healthier play patterns may benefit from structural interventions (e.g., increasing friction, modifying environment to reduce contextual cues) rather than focusing on enhancing need fulfilment.
+Each of these perspectives aligns with broader evidence that subjective intentions and experiences often predict real-world actions only weakly because behavior is multiply determined and heavily constrained by situational affordances [@SheeranWebb2016Intention]. For researchers, our findings therefore suggest that comprehensive models of gaming behavior may need to incorporate reinforcement histories, habits, and regulatory processes alongside need-based motivations [@SharpeEtAl2025Quantifying]. For game developers, they suggest that relying on experiential metrics (e.g., 'fun', satisfaction surveys) may provide an incomplete picture of what sustains engagement. For parents and clinicians, they suggest that efforts to promote healthier play patterns may benefit from structural interventions (e.g., increasing friction, modifying environment to reduce contextual cues) rather than focusing on enhancing need fulfilment.
 
 ## The value of open behavioral data
 
 The introduction to this paper outlined three key limitations in gaming research: lack of researcher access to industry data, temporal mismatch between trace data and surveys, and weak theoretical frameworks. Our study addressed all three by negotiating multi-platform access, implementing daily diaries, and testing theory-driven predictions. Yet the clearest contribution may be demonstrating what becomes visible when self-report is paired with comprehensive behavioral records.
 
-Self-report measures of play behavior commonly correlates with intrinsic motivation, and thereby higher engagement [@NeysEtAl2014exploring; @KosaUysal2024Exploration]. The trace data reveal a different picture. This disconnect is not unique to SDT or gaming; intention-behavior gaps are well-documented across health behaviors, environmental actions, and consumer choices [@SheeranWebb2016Intention]. But it is particularly consequential in a field where theoretical claims increasingly concern behavior, such as how much people play, when they play, what motivates them to start or stop.
+Self-report measures of play behavior commonly correlates with intrinsic motivation, and thereby higher engagement [@NeysEtAl2014exploring; @KosaUysal2024Exploration]. The trace data reveal a different picture. This disconnect is not unique to SDT or gaming; intention-behavior gaps are well-documented across health behaviors, environmental actions, and consumer choices [@SheeranWebb2016Intention]. Whether or not the underlying reasons are shared across these domains and media use, intention-behavior gaps are particularly consequential in a field where theoretical claims increasingly concern behavior, such as how much people play, when they play, what motivates them to start or stop.
 
 The broader lesson extends beyond SDT. As gaming research matures beyond simple quantity-based approaches [@BallouEtAl2025How], theories must be validated against behavioral outcomes, not just self-reported proxies. Open player behavior data, sourced through a mix of player-led data sharing infrastructure, industry partnerships, and other mechanisms, is essential for this work. 
 
-There are, however, practical barriers to making such behavioural evidence routine. Privacy and re-identification risks are non-trivial for high-resolution digital trace data, particularly when combined with survey responses, and these risks create understandable reluctance among both participants and data holders [@RocherEtAl2019Estimating]. Industry incentives also rarely align with open scientific practices: the most informative behavioural data are often commercially sensitive, operationally costly to extract, and legally complex to share across jurisdictions. Methodologically, the field also lacks shared standards for defining sessions, handling idle time, linking multi-platform identities, and documenting preprocessing decisions—each of which can meaningfully affect substantive conclusions.
+There are, however, practical barriers to making such behavioral evidence routine. Privacy and re-identification risks are non-trivial for high-resolution digital trace data, particularly when combined with survey responses, and these risks create understandable reluctance among both participants and data holders [@RocherEtAl2019Estimating]. Industry incentives also rarely align with open scientific practices: the most informative behavioral data are often commercially sensitive, operationally costly to extract, and legally complex to share across jurisdictions. Methodologically, the field also lacks shared standards for defining sessions, handling idle time, linking multi-platform identities, and documenting preprocessing decisions—each of which can meaningfully affect substantive conclusions.
 
-We therefore advocate for multi-platform solutions, mixing both open source and, where possible with high transparency standards, industry collaborations. Multi-platform coverage matters substantively because platform ecosystems structure when and how people play. Different platforms afford different play contexts (e.g., portable vs. fixed-location play, solitary vs. social defaults, friction to launch, and typical session cadence), and these affordances can shift the distribution of sessions across the day and week. When studies observe only a single platform, they risk misclassifying a person’s true “non-play” periods (e.g., apparent disengagement on one platform may simply reflect switching to another), attenuating within-person associations and obscuring displacement dynamics. Single-platform datasets also risk overgeneralizing from idiosyncratic platform cultures and technical constraints (such as background processes, suspend/resume behavior, or account sharing) that can inflate or distort behavioural measures.
+We therefore advocate for multi-platform solutions, mixing both open source and, where possible with high transparency standards, industry collaborations. Multi-platform coverage matters substantively because platform ecosystems structure when and how people play. Different platforms afford different play contexts (e.g., portable vs. fixed-location play, solitary vs. social defaults, friction to launch, and typical session cadence), and these affordances can shift the distribution of sessions across the day and week. When studies observe only a single platform, they risk misclassifying a person’s true “non-play” periods (e.g., apparent disengagement on one platform may simply reflect switching to another), attenuating within-person associations and obscuring displacement dynamics. Single-platform datasets also risk overgeneralizing from idiosyncratic platform cultures and technical constraints (such as background processes, suspend/resume behavior, or account sharing) that can inflate or distort behavioral measures.
 
 ## Limitations and Future Directions
 
-Several limitations qualify the interpretation of the present findings. First, although our analyses focus on within-person associations, these estimates should not be interpreted as causal effects [@RohrerMurayama2021These]. Even with high-frequency longitudinal measurement, within-person variation does not isolate exogenous change: need satisfaction may covary with unmeasured situational factors (e.g., time availability, fatigue, social context) that independently shape gaming behaviour. Our results therefore speak to the strength of empirical coupling between needs and behaviour, not to causal necessity or sufficiency.
+Several limitations qualify the interpretation of the present findings. First, although our analyses focus on within-person associations, these estimates should not be interpreted as causal effects [@RohrerMurayama2021These]. Even with high-frequency longitudinal measurement, within-person variation does not isolate exogenous change: need satisfaction may covary with unmeasured situational factors (e.g., time availability, fatigue, social context) that independently shape gaming behavior. Our results therefore speak to the strength of empirical coupling between needs and behavior, not to causal necessity or sufficiency.
 
 Second, our test of displacement (H3) relies on a hypothetical counterfactual measure: what participants report they would have done had they not played. This approach is coarse and vulnerable to recall bias, rationalisation, and ambiguity in how respondents interpret "most likely" alternatives. While the measure provides a useful first pass at identifying potentially displaced life domains, it is ill-suited for detecting subtle or cumulative displacement processes and likely attenuates any true effects. More rigorous tests of displacement will require objective time-use data or designs that directly observe trade-offs between activities.
 
-Third, the behavioural outcomes examined here reflect short-term engagement patterns, such as session length and return latency. Null or weak associations at this timescale do not rule out need-related effects on longer-term outcomes, such as game choice, persistence over months, or disengagement trajectories. Our conclusions are therefore limited to short-term behavioural dynamics and should not be generalized to all forms of gaming involvement.
+Third, the behavioral outcomes examined here reflect short-term engagement patterns, such as session length and return latency. Null or weak associations at this timescale do not rule out need-related effects on longer-term outcomes, such as game choice, persistence over months, or disengagement trajectories. Our conclusions are therefore limited to short-term behavioral dynamics and should not be generalized to all forms of gaming involvement.
 
-Fourth, while the Study 1 data represent a substantial advancement in capturing comprehensive multi-platform data, they are nonetheless incomplete: players in our sample may have played games on Playstation, played third-party games on Nintendo, or played on mobile (which, while captured, was not captured in sufficient temporal resolution to inform the hypotheses here). Methods for reliably capturing data from each gaming platform should continue require further development.
+Fourth, while the Study 1 data represent a substantial advancement in capturing comprehensive multi-platform data, they are nonetheless incomplete: players in our sample may have played games on Playstation, played third-party games on Nintendo, or played on mobile (which, while captured, was not captured in sufficient temporal resolution to inform the hypotheses here). Methods for reliably capturing data from each gaming platform require further development.
 
-Finally, our sample, although purposively sampled for racial and gender diversity, should be understood as consisting of engaged 18--40 year old players willing to share detailed behavioural data and complete intensive surveys, rather than as representative of all players. This selectivity limits generalizability in two ways. First, casual players, younger adolescents, and individuals with minimal or highly irregular play patterns are underrepresented. Second, highly engaged players' behaviour may differ systematically from those among less engaged populations (e.g,more routinized or more highly habit-driven). The weak need–behaviour associations observed here may not generalize to all player groups, nor do they preclude stronger effects in populations with greater variability in motivation or fewer structural constraints.
+Finally, our sample, although purposively sampled for racial and gender diversity, should be understood as consisting of engaged 18--40 year old players willing to share detailed behavioral data and complete intensive surveys, rather than as representative of all players. This selectivity limits generalizability in two ways. First, casual players, younger adolescents, and individuals with minimal or highly irregular play patterns are underrepresented. Second, highly engaged players' behavior may differ systematically from those among less engaged populations (e.g,more routinized or more highly habit-driven). The weak need–behavior associations observed here may not generalize to all player groups, nor do they preclude stronger effects in populations with greater variability in motivation or fewer structural constraints.
 
-Together, these limitations suggest that the present findings should be interpreted as strong evidence against large, general, short-term behavioural effects of need satisfaction among engaged adult players, rather than as definitive evidence against any role for psychological needs in shaping gaming behaviour more broadly.
+Together, these limitations suggest that the present findings should be interpreted as strong evidence against large, general, short-term behavioral effects of need satisfaction among engaged adult players, rather than as definitive evidence against any role for psychological needs in shaping gaming behavior more broadly.
 
 ## Data Availability
 
@@ -2898,11 +2886,13 @@ This research was supported by the UK Economic and Social Research Council (ES/W
 
 ## Conflicts of Interest
 
-The authors declare no competing interests. 
+The authors declare no competing financial, intellectual, or institutional interests relevant to this research. The disclosures below are provided in the interest of full transparency.
 
-All members of the research team have worked on scientific projects funded by government and charitable grants that used data from gaming companies provided under a data-sharing agreement. MV has provided in-kind consultations and served as a nonpaid panel member for Meta and K-Games. No authors have received funding or compensation from the tech companies or other industries connected to the work presented here.
+All members of the research team have worked on scientific projects funded by government and charitable grants that used data from tech companies provided under a data-sharing agreement. No authors have received funding or compensation from the tech companies or other industries connected to the work presented here. 
 
-The industry data-sharing partners had no role in the design, analysis, or publication of results. 
+MV has provided in-kind consultations and served as a nonpaid panel member for Meta and K-Games. AKP has served in advisory or expert roles for the Sync Digital Wellbeing Program (2022–2024), the Google Expert Advisory on Youth and Technology (2025), the OpenAI Expert Council on Well-Being and AI (2025), and UK Department for Science, Innovation and Technology–funded research on children’s smartphone and social media use (University of Cambridge, 2025). He is a member of the UK Department for Culture, Media & Sport College of Experts. Any industry fees are directly donated to charity, and his research is conducted in accordance with University of Oxford academic integrity policies.
+
+Data-sharing partners had no role in the design, analysis, or publication of results. 
 
 # References
 
@@ -3593,10 +3583,10 @@ summary(sens4_fit)$coefficients$cond |>
 
 ### S5: Full sample imputation (preregistered approach)
 
-Main analysis imputed analytical sample only (≥15 waves, N~555) for statistical soundness. Preregistration specified imputing all participants. Here we implement that approach for comparison, though note that imputing 80%+ missing data for sparse participants is statistically questionable.
+Main analysis imputed analytical sample only (≥15 waves, N = 555) for statistical soundness. Preregistration specified imputing all participants. Here we implement that approach for comparison, though note that imputing 80%+ missing data for sparse participants is statistically questionable.
 
 ```{r}
-#| label: s7-full-imputation
+#| label: s5-full-imputation
 #| output: false
 #| code-summary: "Show code (S5: Run imputation on full sample)"
 
@@ -3853,7 +3843,7 @@ message(glue(
 ```
 
 ```{r}
-#| label: s7-h2-models
+#| label: s5-h2-models
 #| output: false
 #| code-summary: "Show code (S5: Fit H2 models to full sample)"
 
@@ -3879,7 +3869,9 @@ if (file.exists(sens5_cache_file) && file.exists(sens5_pooled_file)) {
   # Fit H2 model to each imputed dataset
   sens5_fits <- lapply(1:M_FULL_SAMPLE, function(i) {
     message(glue("Fitting S5 model to imputation {i} of {M_FULL_SAMPLE}"))
-    dat_i <- dat_full |> filter(.imp == i)
+    dat_i <- dat_full |>
+      filter(.imp == i) |>
+      droplevels()
     glmmTMB(
       telemetry_played_any_24h ~
         game_ns_cw +
@@ -3905,9 +3897,9 @@ if (file.exists(sens5_cache_file) && file.exists(sens5_pooled_file)) {
 ```
 
 ```{r}
-#| label: tbl-s7-comparison
-#| tbl-cap: "S7: H2 model comparison between analytical sample (≥15 waves) and full sample (preregistered)"
-#| code-summary: "Show code (Create S7 comparison table)"
+#| label: tbl-s5-comparison
+#| tbl-cap: "S5: H2 model comparison between analytical sample (≥15 waves) and full sample (preregistered)"
+#| code-summary: "Show code (Create S5 comparison table)"
 
 # Analytical sample results
 analytical <- summary(h2_pooled) |>
@@ -4415,7 +4407,7 @@ bind_rows(
   style_tt(i = 0, bold = TRUE)
 ```
 
-### S9: Game need frustration and play behaviour
+### S9: Game need frustration and play behavior
 
 Testing whether game need frustration (rather than satisfaction) is related to subsequent play behavior. This mirrors the H2a hypothesis but uses frustration instead of satisfaction.
 
