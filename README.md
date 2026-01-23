@@ -1,4 +1,4 @@
-# All BANG, little buck: Weak links between basic psychological needs and logged gaming behaviour
+# All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain
 
 🔗 The manuscript and analysis output from this repo can be viewed at [https://nballou.github.io/basic-needs-in-games/](https://nballou.github.io/basic-needs-in-games/). 🔗
 
