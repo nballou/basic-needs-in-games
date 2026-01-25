@@ -1093,7 +1093,9 @@ Playtime, BANG argues, only becomes problematic when it displaces other activiti
 
 # Study 1: Preregistered Analysis of Multi-Platform Digital Trace Data and Daily Surveys
 
-Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Registered Report [@BallouEtAl2025Psychological]. All data and analysis code are available on Zenodo ({{< meta data-url >}}).
+Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Programmatic Registered Report [@BallouEtAl2025Psychological]. The present report is the first of three preregistered Stage 2 outputs; two other components, focused on sleep and genres, respectively, are forthcoming. 
+
+All data and analysis code are available on Zenodo ({{< meta data-url >}}).
 
 ## Study 1 Method
 
@@ -1157,6 +1159,22 @@ tibble(
 The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.0.0. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, iOS, Android) and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing. Daily data was collected between Oct 2024 and Aug 2025. 
 
 Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, self-reported playing video games for at least 1 hour per week, of which 50% must take place on eligible platforms (Nintendo, Xbox, and Steam), and successfully linked at least one gaming account on Xbox, Steam, and/or Nintendo Switch with validated recent digital trace data. iOS and Android data were collected but are not used in this analysis. For full details of the recruitment procedures and study methodology, see [@BallouEtAl2025Open].
+
+### Ethics
+
+This study received ethical approval from the Social Sciences and Humanities Inter-Divisional Research Ethics Committee at the University of Oxford (OII_CIA_23_107). All participants provided informed consent at the start of the study, including consent to their data being shared openly for reanalysis.
+
+Participants were paid at an average rate of £12/hour, equating to: £0.20 for a 1-minute screening, £2 for the 10-minute intake survey (plus £5 for linking at least one account with recent data), £0.80 for each 4-minute daily survey. Participants received a £10 bonus payment for completing at least 24 out of 30 daily surveys.
+
+### Sample Size Justification 
+
+As specified in the Stage 1 Registered Report, sample size was determined by feasibility/resources rather than a formal power analysis, with an initial target of recruiting up to 1,000 U.S. participants into the diary component, with ~30% expected attrition. Sensitivity analyses showed that this sample size was sufficient to estimate target associations with moderate precision (95% CI spanning .13 scale points on a 7-point scale) (https://github.com/digital-wellbeing/platform-study-rr).
+
+### Participant Inclusion/Exclusion Criteria
+
+All eligibility and exclusion criteria were specified prior to data analysis in Stage 1 and/or documented as deviations in @tbl-deviations. Participants were eligible if they were aged 18+, resided in the U.S., reported playing video games at least 1 hour/week, reported that a substantial share of their gaming occurred on eligible platforms (Nintendo/Xbox/Steam), and successfully linked at least one eligible account with validated recent digital trace data. As documented, two eligibility thresholds were adjusted for feasibility relative to Stage 1: the platform-share requirement was lowered (75% → 50%), and the recent valid trace requirement was extended (7 days → 14 days).
+
+Participants who completed fewer than 15 daily surveys were excluded from the primary (imputed) analyses. The ≥15-survey threshold aligns with the Stage 1 criterion of avoiding analyses that would require imputing more data than collected (≥50%).
 
 ### Participants
 
@@ -1647,11 +1665,9 @@ The measures used in this paper are visualized in @fig-descriptives and detailed
 
 *Displacement*: We measured displacement of core life domains via an open text field asking participants about the hypothetical alternative activity: "Think back to your most recent gaming session. If you hadn't played a game, what would you most likely have done instead?" With LLM assistance from Qwen3-4b-instruct [@qwen3technicalreport], we coded participant responses based on whether they mentioned any of the following activities: work/school responsibilities, social engagements, sleep/eating/fitness, or caretaking---so-called "core life domains". We refined the LLM prompt through 5 iterations of manual verification of the 100 random coded responses. We created a boolean variable indicating whether any core life domain was hypothetically displaced. Full materials are provided in the supplement, including the exact LLM prompt used for classification, all raw participant responses, coded outputs, manual verification results, and reproducible code.
 
-### Analysis Approach
+### Data Exclusions
 
-We tested each hypothesis using multilevel within-between regression models estimated with `glmmTMB` [@BrooksEtAl2017glmmTMB]. Focal predictors were within-person mean-centered, with 30-day person means included to separate day-level from 30-day aggregate associations. All models included random intercepts and AR(1) autocorrelation structures; H1 and H3 additionally included random slopes for day-level predictors, while H2 used random intercepts only due to convergence issues with the binary outcome. No demographic covariates were included, as the within-between specification controls for all time-invariant individual differences.
-
-This approach isolates day-to-day dynamics: day-level coefficients estimate how much a person's outcome deviates from their own 30-day average when their predictor deviates from their own 30-day average. For example, H1's day-level coefficient answers: 'On days when individuals experience better game need satisfaction than their typical level, do they report higher global need satisfaction than their typical level?' The non-focal 30-day aggregate coefficients capture whether people with generally higher predictor levels also have generally higher outcomes across the study period. Random effects account for stable individual differences (e.g., personality, gaming preferences), and the AR(1) term models temporal autocorrelation in daily data. This specification does not adjust for time-varying confounds; estimates should be interpreted as associations rather than causal effects.
+Consistent with Stage 1, we applied preregistered exclusions to telemetry records prior to analysis: we excluded telemetry days with >16 hours total logged play across linked platforms, sessions >8 hours, and sessions logged in the future (indicating logging error or system-clock manipulation). We also excluded survey responses failing the preregistered attention check (duplicate need item responses differing by >1 scale point). As part of preregistered data quality processing, we removed background sessions and verified there were no overlapping sessions after preprocessing, before proceeding to the planned analyses. No additional exclusion criteria beyond those preregistered were introduced.
 
 ### Imputation
 
@@ -1736,12 +1752,11 @@ cor_playtime_inline <- glue(
 
 As specified in the preregistration, we assessed two positive controls designed to assess whether our data were capable of addressing our stated hypotheses. Both passed: self-reported playtime correlated positively with logged playtime (`r cor_playtime_inline`); and after preprocessing (e.g., to remove background sessions), there were no overlapping sessions. We therefore proceeded with the planned analyses.
 
-### Ethics
+### Analysis Approach
 
-This study received ethical approval from the Social Sciences and Humanities Inter-Divisional Research Ethics Committee at the University of Oxford (OII_CIA_23_107). All participants provided informed consent at the start of the study, including consent to their data being shared openly for reanalysis.
+We tested each hypothesis using multilevel within-between regression models estimated with `glmmTMB` [@BrooksEtAl2017glmmTMB]. Focal predictors were within-person mean-centered, with 30-day person means included to separate day-level from 30-day aggregate associations. All models included random intercepts and AR(1) autocorrelation structures; H1 and H3 additionally included random slopes for day-level predictors, while H2 used random intercepts only due to convergence issues with the binary outcome. No demographic covariates were included, as the within-between specification controls for all time-invariant individual differences.
 
-Participants were paid at an average rate of £12/hour, equating to: £0.20 for a 1-minute screening, £2 for the 10-minute intake survey (plus £5 for linking at least one account with recent data), £0.80 for each 4-minute daily survey. Participants received a £10 bonus payment for completing at least 24 out of 30 daily surveys.
-
+This approach isolates day-to-day dynamics: day-level coefficients estimate how much a person's outcome deviates from their own 30-day average when their predictor deviates from their own 30-day average. For example, H1's day-level coefficient answers: 'On days when individuals experience better game need satisfaction than their typical level, do they report higher global need satisfaction than their typical level?' The non-focal 30-day aggregate coefficients capture whether people with generally higher predictor levels also have generally higher outcomes across the study period. Random effects account for stable individual differences (e.g., personality, gaming preferences), and the AR(1) term models temporal autocorrelation in daily data. This specification does not adjust for time-varying confounds; estimates should be interpreted as associations rather than causal effects.
 
 ## Study 1 Results: Confirmatory
 
@@ -2901,6 +2916,10 @@ Data-sharing partners had no role in the design, analysis, or publication of res
 
 ```{=typst}
 #set page(columns: 1)
+```
+
+```{=typst}                                               
+#show: appendix.with(prefix: "A")
 ```
 # Appendix
 

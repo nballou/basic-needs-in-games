@@ -411,7 +411,7 @@
   })
 
   // Word count with wordometer package
-  show: word-count.with(exclude: (<refs>))
+  show: word-count.with(exclude: (<refs>, <appendix>))
 
   /* Document content */
   doc
