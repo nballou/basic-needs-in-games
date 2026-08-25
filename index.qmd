@@ -1,6 +1,6 @@
 ---
 title: |
-  All BANG, little buck: Need-related experiences are weakly linked with behavior in the video game domain
+  All BANG, little buck: Basic psychological needs are weakly linked with video gaming behavior
 author:
   - name: Nick Ballou
     corresponding: true
@@ -169,7 +169,6 @@ library(ggdist)
 library(splines)
 library(scales)
 library(janitor)
-
 ```
 
 ```{r}
@@ -249,7 +248,6 @@ labels <- c(
 
 # Load custom functions
 source("R/helpers.R")
-
 ```
 
 ```{r}
@@ -257,13 +255,13 @@ source("R/helpers.R")
 #| code-summary: "Show code (Download and load raw data from Zenodo)"
 
 # Download data from Zenodo (one-time download, then cached locally)
-zenodo_url <- "https://zenodo.org/records/17609160/files/digital-wellbeing/open-play-v1.0.0.zip?download=1"
-zip_path <- "data/open-play-v1.0.0.zip"
+zenodo_url <- "https://zenodo.org/records/21986572/files/digital-wellbeing/open-play-v1.2.5.zip?download=1"
+zip_path <- "data/open-play-v1.2.5.zip"
 
 if (!file.exists(zip_path)) {
   dir.create(dirname(zip_path), showWarnings = FALSE, recursive = TRUE)
 
-  # Set longer timeout for large file (194MB) - default is 60 seconds
+  # Set longer timeout for large file (194MB)
   options(timeout = max(600, getOption("timeout")))
 
   message("Downloading 194MB file from Zenodo (may take a few minutes)...")
@@ -282,7 +280,7 @@ if (!file.exists(zip_path)) {
 }
 
 # Extract zip if not already extracted
-extract_dir <- "data/open-play-v1.0.0"
+extract_dir <- "data/open-play-v1.2.5"
 if (!dir.exists(extract_dir)) {
   message("Extracting zip archive...")
   unzip(zip_path, exdir = "data")
@@ -316,7 +314,6 @@ steam <- read_csv(
 
 # Load helper functions
 source(file.path(extract_dir, "R/helpers.R"))
-
 ```
 
 ```{r}
@@ -539,7 +536,6 @@ intake_aux <- intake |>
     edu_level,
     employment,
     marital_status,
-    life_sat_baseline = life_sat,
     wemwbs,
     diaries_completed,
     self_reported_weekly_play
@@ -577,12 +573,13 @@ surveys <- surveys |>
     edu_level,
     employment,
     marital_status,
-    life_sat_baseline,
     wemwbs,
     diaries_completed,
     self_reported_weekly_play,
     # Self-reported play (used to control BANGS imputation)
     self_reported_played_24h,
+    # Life satisfaction (not imputed; used for positive control only)
+    life_sat,
     # Variables to impute: individual items only (composites calculated post-imputation)
     bpnsfs_1,
     bpnsfs_2,
@@ -607,7 +604,6 @@ surveys <- surveys |>
     telemetry_played_any_24h_pre,
     play_minutes_24h_pre
   )
-
 ```
 
 ```{r}
@@ -665,7 +661,6 @@ surveys_wide <- surveys |>
     edu_level,
     employment,
     marital_status,
-    life_sat_baseline,
     wemwbs,
     diaries_completed,
     self_reported_weekly_play,
@@ -692,7 +687,6 @@ surveys_wide <- surveys |>
       edu_level,
       employment,
       marital_status,
-      life_sat_baseline,
       wemwbs,
       diaries_completed,
       self_reported_weekly_play
@@ -752,7 +746,6 @@ person_level_vars <- c(
   "edu_level",
   "employment",
   "marital_status",
-  "life_sat_baseline",
   "wemwbs",
   "diaries_completed",
   "self_reported_weekly_play"
@@ -937,7 +930,153 @@ pct_ppl_with_missing <- number(
   100 * n_ppl_with_missing / nrow(surveys_wide),
   0.1
 )
+```
 
+```{r}
+#| label: threshold-imputations
+#| output: false
+#| code-summary: "Show code (Run imputations for threshold sensitivity, S6)"
+
+# Imputation function for threshold sensitivity analysis (S6)
+# Replicates primary imputation pipeline for a given min-waves cutoff
+# M=10 is sufficient for a robustness check; results cached per threshold
+run_threshold <- function(min_waves, m = 10) {
+  cache_file <- glue("data/models/threshold_{min_waves}_imp.csv.gz")
+
+  if (file.exists(cache_file)) {
+    message(glue("Loading threshold={min_waves} imputation from cache"))
+    return(read_csv(cache_file, show_col_types = FALSE) |> as.mids())
+  }
+
+  message(glue(
+    "Running imputation for threshold={min_waves} (M={m}), started {Sys.time()}"
+  ))
+
+  sw <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(
+      pid,
+      wave,
+      age,
+      gender,
+      edu_level,
+      employment,
+      marital_status,
+      wemwbs,
+      diaries_completed,
+      self_reported_weekly_play,
+      self_reported_played_24h,
+      displaced_core_domain,
+      bpnsfs_1,
+      bpnsfs_2,
+      bpnsfs_3,
+      bpnsfs_4,
+      bpnsfs_5,
+      bpnsfs_6,
+      bangs_1,
+      bangs_2,
+      bangs_3,
+      bangs_4,
+      bangs_5,
+      bangs_6
+    ) |>
+    pivot_wider(
+      id_cols = c(
+        pid,
+        age,
+        gender,
+        edu_level,
+        employment,
+        marital_status,
+        wemwbs,
+        diaries_completed,
+        self_reported_weekly_play
+      ),
+      names_from = wave,
+      values_from = c(
+        self_reported_played_24h,
+        displaced_core_domain,
+        bpnsfs_1,
+        bpnsfs_2,
+        bpnsfs_3,
+        bpnsfs_4,
+        bpnsfs_5,
+        bpnsfs_6,
+        bangs_1,
+        bangs_2,
+        bangs_3,
+        bangs_4,
+        bangs_5,
+        bangs_6
+      ),
+      names_sep = "_w"
+    )
+
+  played_vars_t <- grep("^self_reported_played_24h_w", names(sw), value = TRUE)
+  bpnsfs_vars_t <- grep("^bpnsfs_[1-6]_w", names(sw), value = TRUE)
+  bangs_vars_t <- grep("^bangs_[1-6]_w", names(sw), value = TRUE)
+  displaced_vars_t <- grep("^displaced_core_domain_w", names(sw), value = TRUE)
+
+  methods_t <- setNames(rep("", ncol(sw)), names(sw))
+  methods_t[played_vars_t] <- "logreg"
+  methods_t[c(bpnsfs_vars_t, bangs_vars_t, displaced_vars_t)] <- "pmm"
+  methods_t[c(
+    "pid",
+    "age",
+    "gender",
+    "edu_level",
+    "employment",
+    "marital_status",
+    "wemwbs",
+    "diaries_completed",
+    "self_reported_weekly_play"
+  )] <- ""
+
+  where_t <- is.na(sw)
+  for (bv in bangs_vars_t) {
+    wave_num <- str_extract(bv, "\\d+$")
+    pv <- paste0("self_reported_played_24h_w", wave_num)
+    if (pv %in% names(sw)) {
+      where_t[sw[[pv]] == "No" & is.na(sw[[bv]]), bv] <- FALSE
+    }
+  }
+
+  pred_t <- quickpred(
+    sw,
+    mincor = 0.3,
+    minpuc = 0.3,
+    include = c("age", "wemwbs", "self_reported_weekly_play"),
+    exclude = c(
+      "pid",
+      "gender",
+      "edu_level",
+      "employment",
+      "marital_status",
+      "diaries_completed"
+    )
+  )
+
+  imp_t <- futuremice(
+    data = sw,
+    m = m,
+    method = methods_t,
+    predictorMatrix = pred_t,
+    where = where_t,
+    maxit = 5,
+    n.core = parallel::detectCores() - 1,
+    parallelseed = 8675309
+  )
+
+  message(glue("Completed threshold={min_waves} imputation {Sys.time()}"))
+  imp_long_t <- complete(imp_t, action = "long", include = TRUE)
+  dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+  write_csv(imp_long_t, cache_file)
+  as.mids(imp_long_t)
+}
+
+threshold_values <- c(10, 12, 15, 18, 20, 24)
+threshold_imps <- map(threshold_values, run_threshold)
+names(threshold_imps) <- threshold_values
 ```
 
 ```{r}
@@ -962,7 +1101,6 @@ daily_imputed <- complete(imp, action = "long", include = TRUE) |>
       edu_level,
       employment,
       marital_status,
-      life_sat_baseline,
       wemwbs,
       diaries_completed,
       self_reported_weekly_play
@@ -1027,12 +1165,207 @@ daily_imputed <- daily_imputed |>
 
 # Helper object for mice::with() and pool() if needed
 imp_mids <- as.mids(daily_imputed)
+```
 
+
+```{r}
+#| label: study2-data-download
+#| code-summary: "Show code (Download PWS data from OSF)"
+
+# Download PWS data from OSF
+path_pws <- "data/pws/pws_data.zip"
+if (!file.exists(path_pws)) {
+  dir.create("data/pws", showWarnings = FALSE, recursive = TRUE)
+  download.file(
+    url = "https://osf.io/download/j48qf/",
+    destfile = path_pws
+  )
+}
+
+# Extract only the study_prompt_answered.csv file we need
+if (!file.exists("data/pws/study_prompt_answered.csv")) {
+  unzip(
+    zipfile = path_pws,
+    files = "data/study_prompt_answered.csv",
+    exdir = "data/pws",
+    junkpaths = TRUE
+  )
+}
+```
+
+```{r}
+#| label: study2-data-prep
+#| code-summary: "Show code (Prepare PWS session data)"
+
+if (!file.exists("data/pws/pws_sessions.csv")) {
+  # Load and process prompts
+  pws_raw <- read_csv(
+    "data/pws/study_prompt_answered.csv",
+    col_select = c(
+      pid,
+      time = Time_utc,
+      duration = CurrentSessionLength,
+      prompt = LastStudyPromptType,
+      response
+    ),
+    show_col_types = FALSE
+  ) |>
+    mutate(
+      pid = factor(pid),
+      # The raw VAS responses are stored on a 0-1000 internal scale (not the
+      # documented 0-100 -- confirmed via schema.sql and the observed range/
+      # granularity of `response`, consistent across all six prompt types),
+      # so we divide by 1000 to recover a 0-1 fraction, then rescale that to
+      # a 1-7 scale matching Study A's BANGS items.
+      response = 1 + (response / 1000) * 6
+    ) |>
+    arrange(pid, time) |>
+    mutate(
+      # Calculate time since last prompt in minutes
+      time_since_last = as.numeric(
+        difftime(
+          time,
+          lag(time, 1, default = as_datetime("1970-01-01")),
+          units = "mins"
+        )
+      ),
+      # New session if gap > 30 minutes
+      new_session = time_since_last > 30,
+      session = cumsum(new_session),
+      .by = pid
+    ) |>
+    select(-time_since_last)
+
+  # Save prompt-level data for troubleshooting (includes all prompt times)
+  pws_prompts_detail <- pws_raw |>
+    select(-new_session) |>
+    group_by(pid, session) |>
+    filter(n() > 1) |>
+    mutate(
+      prompt_time = time,
+      first_time = first(time),
+      first_duration = first(duration),
+      startTime = if_else(
+        first_duration < 15,
+        first_time - first_duration * 60,
+        first_time
+      ),
+      startTime = min(startTime),
+      endTime = max(time),
+      sessionLength = round(as.integer(endTime - startTime) / 60, 2)
+    ) |>
+    ungroup() |>
+    select(
+      pid,
+      session,
+      prompt_time,
+      prompt,
+      response,
+      duration,
+      startTime,
+      endTime,
+      sessionLength
+    )
+
+  # Summarize for analysis
+  pws_prompts <- pws_raw |>
+    select(-new_session) |>
+    group_by(pid, session) |>
+    filter(n() > 1) |>
+    mutate(
+      first_time = first(time),
+      first_duration = first(duration),
+      startTime = if_else(
+        first_duration < 15,
+        first_time - first_duration * 60,
+        first_time
+      ),
+      startTime = min(startTime),
+      endTime = max(time)
+    ) |>
+    select(-first_time, -first_duration) |>
+    group_by(pid, session, prompt) |>
+    summarise(
+      numPrompts = n(),
+      mean = mean(response, na.rm = TRUE),
+      startTime = first(startTime),
+      endTime = first(endTime),
+      .groups = "drop"
+    ) |>
+    mutate(
+      sessionLength = round(as.integer(endTime - startTime) / 60, 2),
+      mean = ifelse(is.nan(mean), NA_real_, mean)
+    )
+
+  # Convert to wide format
+  pws_wide <- pws_prompts |>
+    filter(sessionLength > 5 & sessionLength < 480) |>
+    pivot_wider(
+      id_cols = c(pid, session, startTime, endTime, sessionLength),
+      names_from = prompt,
+      values_from = c(numPrompts, mean),
+      names_sort = TRUE
+    ) |>
+    select(-contains("_NA")) |>
+    janitor::clean_names() |>
+    group_by(pid) |>
+    mutate(
+      session_gap = lead(start_time, 1) - end_time,
+      session_gap = round(as.integer(session_gap) / 60 / 60, 2),
+      prev_session_length = lag(session_length, 1),
+      prev_session_gap = lag(session_gap, 1),
+      # Combine autonomy and competence into game need satisfaction
+      game_ns = (mean_autonomy + mean_competence) / 2,
+      # Calculate person means
+      game_ns_pm = mean(game_ns, na.rm = TRUE),
+      session_length_pm = mean(session_length, na.rm = TRUE),
+      session_gap_pm = mean(session_gap, na.rm = TRUE)
+    ) |>
+    ungroup() |>
+    # Calculate grand means and centered values
+    mutate(
+      game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
+      session_length_gm = mean(session_length_pm, na.rm = TRUE),
+      session_gap_gm = mean(session_gap_pm, na.rm = TRUE),
+      # Within-person centered (deviation from person mean)
+      game_ns_cw = game_ns - game_ns_pm,
+      session_length_cw = session_length - session_length_pm,
+      session_gap_cw = session_gap - session_gap_pm,
+      # Between-person centered (person mean - grand mean)
+      game_ns_cb = game_ns_pm - game_ns_gm,
+      session_length_cb = session_length_pm - session_length_gm,
+      session_gap_cb = session_gap_pm - session_gap_gm
+    ) |>
+    select(
+      pid,
+      session,
+      session_length,
+      session_gap,
+      prev_session_length,
+      prev_session_gap,
+      everything()
+    )
+
+  write_csv(pws_wide, "data/pws/pws_sessions.csv")
+  write_csv(pws_prompts_detail, "data/pws/pws_prompts_detail.csv")
+} else {
+  pws_wide <- read_csv("data/pws/pws_sessions.csv", show_col_types = FALSE)
+  pws_prompts_detail <- read_csv(
+    "data/pws/pws_prompts_detail.csv",
+    show_col_types = FALSE
+  )
+}
+
+# Store sample size for inline reporting
+pws_n_players <- length(unique(pws_wide$pid))
+pws_n_sessions <- nrow(pws_wide)
+pws_n_players_fmt <- scales::comma(pws_n_players)
+pws_n_sessions_fmt <- scales::comma(pws_n_sessions)
 ```
 
 ---
 abstract: |
-  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behavior, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study 1 (preregistered) analyzes 11k daily observations from 555 U.S. players with 30 days of multi-platform digital trace data. Study 2 (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction was robustly associated with subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta data-url >}}.
+  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behavior, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study A (preregistered) analyzes 11k daily observations from 555 U.S. players with 30 days of multi-platform digital trace data. Study B (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction was robustly associated with subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta data-url >}}.
 ---
 
 # Introduction
@@ -1091,13 +1424,13 @@ Playtime, BANG argues, only becomes problematic when it displaces other activiti
 
 *H3. When a person’s most recent gaming is reported to displace a core life domain (work/school, social engagements, sleep/eating/fitness, or caretaking), their global need satisfaction is lower.*
 
-# Study 1: Preregistered Analysis of Multi-Platform Digital Trace Data and Daily Surveys
+# Study A: Preregistered Analysis of Multi-Platform Digital Trace Data and Daily Surveys
 
-Study 1 was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Programmatic Registered Report [@BallouEtAl2025Psychological]. The present report is the first of three preregistered Stage 2 outputs; two other components, focused on sleep and genres, respectively, are forthcoming. 
+Study A was pre-registered on the Open Science Framework (OSF) in the form of a Stage 1 Programmatic Registered Report [@BallouEtAl2025Psychological] at *Peer Community In: Registered Reports*. The present Study A corresponds to Study 1 in the programmatic Registered Report; two other preregistered Stage 2 outputs, focused on sleep (Registered Report Study 2) and genres (Registered Report Study 3), respectively, are forthcoming. 
 
 All data and analysis code are available on Zenodo ({{< meta data-url >}}).
 
-## Study 1 Method
+## Study A Method
 
 ::: {.place arguments='top, scope: "parent", float: true'}
 
@@ -1156,9 +1489,9 @@ tibble(
 
 ### Design
 
-The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.0.0. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, iOS, Android) and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing. Daily data was collected between Oct 2024 and Aug 2025. 
+The data for this study comprise a subset of the data from the Open Play study [@BallouEtAl2025Open], version 1.2.5. In the Open Play study, participants provided access to automated records of their gaming history on one or more platforms (Xbox, Steam, Nintendo Switch, iOS, Android) and completed an intake survey followed by a 30-day daily diary study. The intake survey included demographic questions and baseline measures of wellbeing. Daily data was collected between Oct 2024 and Aug 2025. 
 
-Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, self-reported playing video games for at least 1 hour per week, of which 50% must take place on eligible platforms (Nintendo, Xbox, and Steam), and successfully linked at least one gaming account on Xbox, Steam, and/or Nintendo Switch with validated recent digital trace data. iOS and Android data were collected but are not used in this analysis. For full details of the recruitment procedures and study methodology, see [@BallouEtAl2025Open].
+Participants were recruited in collaboration with two panel providers, Prolific and PureProfile. Participants were eligible if they were aged 18 or older, resided in the United States, self-reported playing video games for at least 1 hour per week with ≥50% of that gaming taking place on eligible platforms (Nintendo, Xbox, and Steam), and successfully linked at least one gaming account on Xbox, Steam, and/or Nintendo Switch with validated recent digital trace data. iOS and Android data were collected but are not used in this analysis. For full details of the recruitment procedures and study methodology, see [@BallouEtAl2025Open].
 
 ### Ethics
 
@@ -1652,7 +1985,6 @@ hours_steam <- number(
   1,
   big.mark = ","
 )
-
 ```
 
 The measures used in this paper are visualized in @fig-descriptives and detailed below. For other measures in the Open Play study not used here, we refer readers to the Open Play codebook [@BallouEtAl2025Open]. 
@@ -1665,13 +1997,101 @@ The measures used in this paper are visualized in @fig-descriptives and detailed
 
 *Displacement*: We measured displacement of core life domains via an open text field asking participants about the hypothetical alternative activity: "Think back to your most recent gaming session. If you hadn't played a game, what would you most likely have done instead?" With LLM assistance from Qwen3-4b-instruct [@qwen3technicalreport], we coded participant responses based on whether they mentioned any of the following activities: work/school responsibilities, social engagements, sleep/eating/fitness, or caretaking---so-called "core life domains". We refined the LLM prompt through 5 iterations of manual verification of the 100 random coded responses. We created a boolean variable indicating whether any core life domain was hypothetically displaced. Full materials are provided in the supplement, including the exact LLM prompt used for classification, all raw participant responses, coded outputs, manual verification results, and reproducible code.
 
+::: {.place arguments='top, scope: "parent", float: true'}
+
+```{r}
+#| label: tbl-descriptive-studyA
+#| tbl-cap: "Descriptive statistics for primary Study A and Study B variables, decomposed into between- and within-person components."
+#| code-summary: "Show code (Build multilevel descriptive statistics table)"
+
+# Decompose a variable's variance into between- and within-person components,
+# using the same var()-based approach as fig-descriptives panel B
+describe_multilevel <- function(value, pid) {
+  value <- as.numeric(value)
+  var_total <- var(value, na.rm = TRUE)
+  var_between <- var(tapply(value, pid, mean, na.rm = TRUE), na.rm = TRUE)
+  var_within <- var_total - var_between
+
+  tibble(
+    M = mean(value, na.rm = TRUE),
+    median = median(value, na.rm = TRUE),
+    sd_total = sqrt(var_total),
+    sd_between = sqrt(var_between),
+    sd_within = sqrt(var_within),
+    icc1 = var_between / var_total
+  )
+}
+
+desc_vars_a <- tribble(
+  ~var                       , ~Variable                     , ~is_pct ,
+  "game_ns"                  , "Game need satisfaction"      , FALSE   ,
+  "global_ns"                , "Global need satisfaction"    , FALSE   ,
+  "global_nf"                , "Global need frustration"     , FALSE   ,
+  "play_minutes_24h"         , "Playtime, next 24h (min)"    , FALSE   ,
+  "telemetry_played_any_24h" , "Any play, next 24h (%)"      , TRUE    ,
+  "displaced_core_domain"    , "Displaced a core domain (%)" , TRUE
+) |>
+  mutate(stats = map(var, ~ describe_multilevel(dat_desc[[.x]], dat_desc$pid)))
+
+desc_vars_b <- tribble(
+  ~var             , ~Variable                , ~is_pct ,
+  "game_ns"        , "Game need satisfaction" , FALSE   ,
+  "session_length" , "Session length (min)"   , FALSE   ,
+  "session_gap"    , "Session gap (hrs)"      , FALSE
+) |>
+  mutate(stats = map(var, ~ describe_multilevel(pws_wide[[.x]], pws_wide$pid)))
+
+desc_table <- bind_rows(
+  `Study A` = desc_vars_a,
+  `Study B` = desc_vars_b,
+  .id = "study"
+) |>
+  unnest(stats) |>
+  mutate(
+    scale = if_else(is_pct, 100, 1),
+    accuracy = if_else(is_pct, 0.1, 0.01),
+    M = number(M * scale, accuracy),
+    Median = number(median * scale, accuracy),
+    `SD (Total)` = number(sd_total * scale, accuracy),
+    `SD (Between)` = number(sd_between * scale, accuracy),
+    `SD (Within)` = number(sd_within * scale, accuracy),
+    `ICC(1)` = number(icc1, 0.01)
+  ) |>
+  select(
+    study,
+    Variable,
+    M,
+    `Median`,
+    `SD (Total)`,
+    `SD (Between)`,
+    `SD (Within)`,
+    `ICC(1)`
+  )
+
+group_rows <- list(
+  "Study A" = 1,
+  "Study B" = nrow(desc_vars_a) + 1
+)
+
+desc_table |>
+  select(-study) |>
+  tt(
+    notes = "SD (Total) is pooled across all observations (person-days in Study A, sessions in Study B); SD (Between) is the SD of person-level means; SD (Within) is the residual person-mean-centered SD. ICC(1) = between-person variance / total variance. Game need satisfaction is on a 1-7 scale in both studies. Study A playtime is in minutes; Study A binary variables are shown as percentages. Study B session length is in minutes and session gap in hours."
+  ) |>
+  group_tt(i = group_rows) |>
+  style_tt(fontsize = 0.7) |>
+  style_tt(i = 0, bold = TRUE)
+```
+
+:::
+
 ### Data Exclusions
 
 Consistent with Stage 1, we applied preregistered exclusions to telemetry records prior to analysis: we excluded telemetry days with >16 hours total logged play across linked platforms, sessions >8 hours, and sessions logged in the future (indicating logging error or system-clock manipulation). We also excluded survey responses failing the preregistered attention check (duplicate need item responses differing by >1 scale point). As part of preregistered data quality processing, we removed background sessions and verified there were no overlapping sessions after preprocessing, before proceeding to the planned analyses. No additional exclusion criteria beyond those preregistered were introduced.
 
 ### Imputation
 
-We used multiple imputation by chained equations (MICE) with predictive mean matching (PMM) to handle missing data. Missing data were imputed for daily need satisfaction/frustration items (BPNSFS, BANGS) and displacement measures (an average of `r overall_miss_pct`% missing cells across `r pct_ppl_with_missing`% of participants with at least one wave of missing data). Digital trace data were not imputed because tracking was continuous and automatic; within-platform, missing data represent recorded absence of play. 
+We used multiple imputation by chained equations (MICE) with predictive mean matching (PMM) to handle missing data. Missing data were imputed for daily need satisfaction/frustration items (BPNSFS, BANGS) and displacement measures (an average of `r overall_miss_pct`% missing cells across `r pct_ppl_with_missing`% of participants with at least one wave of missing data). Digital trace data were not imputed because tracking was continuous and automatic; missing data represent recorded absence of play. 
 
 Following the two-stage protocol from @VonHippel2020How based on fraction of missing information, we used 27 imputations. For all variables, imputed distributions closely overlapped with the observed data (see Appendix @fig-imputation). Models were fit separately to each imputed dataset, and estimates were pooled across imputations using Rubin's rules as implemented in the `mice` package [@vanBuurenGroothuis-Oudshoorn2011mice]. For comparison, complete case analyses are reported in the Appendix (Sensitivity Analysis 4); results do not meaningfully differ from the imputed analyses.
 
@@ -1748,9 +2168,18 @@ cor_playtime_inline <- glue(
   "r = {number(cor_playtime$estimate, .01)}, 95% CI [{number(cor_playtime$conf.int[1], .01)}, {number(cor_playtime$conf.int[2], .01)}]"
 )
 
+cor_lifesat <- cor.test(
+  rowMeans(surveys[, c("bpnsfs_1", "bpnsfs_3", "bpnsfs_5")], na.rm = FALSE),
+  surveys$life_sat,
+  method = "pearson"
+)
+
+cor_lifesat_inline <- glue(
+  "r = {number(cor_lifesat$estimate, .01)}, 95% CI [{number(cor_lifesat$conf.int[1], .01)}, {number(cor_lifesat$conf.int[2], .01)}]"
+)
 ```
 
-As specified in the preregistration, we assessed two positive controls designed to assess whether our data were capable of addressing our stated hypotheses. Both passed: self-reported playtime correlated positively with logged playtime (`r cor_playtime_inline`); and after preprocessing (e.g., to remove background sessions), there were no overlapping sessions. We therefore proceeded with the planned analyses.
+As specified in the preregistration, we assessed three positive controls designed to assess whether our data were capable of addressing our stated hypotheses. All three passed: self-reported playtime correlated positively with logged playtime (`r cor_playtime_inline`); global need satisfaction correlated positively with life satisfaction (`r cor_lifesat_inline`); and after preprocessing (e.g., to remove background sessions), there were no overlapping sessions. We therefore proceeded with the planned analyses.
 
 ### Analysis Approach
 
@@ -1758,7 +2187,7 @@ We tested each hypothesis using multilevel within-between regression models esti
 
 This approach isolates day-to-day dynamics: day-level coefficients estimate how much a person's outcome deviates from their own 30-day average when their predictor deviates from their own 30-day average. For example, H1's day-level coefficient answers: 'On days when individuals experience better game need satisfaction than their typical level, do they report higher global need satisfaction than their typical level?' The non-focal 30-day aggregate coefficients capture whether people with generally higher predictor levels also have generally higher outcomes across the study period. Random effects account for stable individual differences (e.g., personality, gaming preferences), and the AR(1) term models temporal autocorrelation in daily data. This specification does not adjust for time-varying confounds; estimates should be interpreted as associations rather than causal effects.
 
-## Study 1 Results: Confirmatory
+## Study A Results: Confirmatory
 
 We present visualizations for each hypothesis test in turn; all key estimates are summarized @tbl-main-results.
 
@@ -1806,7 +2235,6 @@ if (file.exists(h1_cache_file) && file.exists(h1_pooled_file)) {
   saveRDS(h1_pooled, h1_pooled_file)
   message("Saved H1 model fits to cache")
 }
-
 ```
 
 ```{r}
@@ -1869,7 +2297,7 @@ h1_results <- h1_summary |>
 
 ```{r}
 #| label: fig-h1-predictions
-#| fig-cap: "Estimated global need satisfaction as a function of need satisfaction in games. Individual trajectories shown as gray lines, population-level association shown as blue line with 95% confidence ribbon."
+#| fig-cap: "Estimated global need satisfaction as a function of need satisfaction in games (H1). Individual trajectories shown as gray lines, population-level association shown as blue line with 95% confidence ribbon."
 #| code-summary: "Show code (Plot H1)"
 
 plot_relationship(
@@ -1882,14 +2310,13 @@ plot_relationship(
   within_vars = c("game_ns_cw"),
   between_vars = c("game_ns_cb")
 )
-
 ```
 
 :::
 
-Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (β = `r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
+Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (B = `r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
 
-At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (β = `r h1_agg_est`) was strong, indicating strong between-individual differences. 
+At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (B = `r h1_agg_est`) was strong, indicating strong between-individual differences. 
 
 ### H2. Situational need satisfaction is positively associated with the likelihood of playing in the period after survey completion (H2a), while global need frustration is negatively associated (H2b)
 
@@ -1950,7 +2377,8 @@ h2a_ests <- report_wb_estimate(
   h2_summary,
   "game_ns_cw",
   "game_ns_cb",
-  accuracy = 0.01
+  accuracy = 0.01,
+  stat_label = "z"
 )
 h2a_day_est <- h2a_ests$day_level
 h2a_day_coef <- h2a_ests$day_coef
@@ -1962,7 +2390,8 @@ h2b_ests <- report_wb_estimate(
   h2_summary,
   "global_nf_cw",
   "global_nf_cb",
-  accuracy = 0.01
+  accuracy = 0.01,
+  stat_label = "z"
 )
 h2b_day_est <- h2b_ests$day_level
 h2b_day_coef <- h2b_ests$day_coef
@@ -2083,7 +2512,7 @@ recalculateResiduals(sim_resid, group = h2mod$frame$pid) |>
 #| label: fig-h2-predictions
 #| fig-cap: "Estimated probability of playing in subsequent 24 hours. (A) As a function of need satisfaction in games (H2a). (B) As a function of global need frustration (H2b). Individual trajectories shown as gray lines, population-level associations shown with 95% confidence ribbons."
 #| code-summary: "Show code (Plot H2)"
-#| fig-asp: 0.4
+#| fig-asp: 0.5
 
 # Panel A: Game need satisfaction
 p_h2a <- plot_relationship(
@@ -2121,20 +2550,20 @@ p_h2a +
 
 We tested H2a and H2b using a single multilevel within-between logistic regression, where in-game need satisfaction and global need frustration (each within- and between-person centered) predicted a binary variable whether any play happened in the 24-hour period after diary survey completion.
 
-Results support neither H2a or H2b: at the day level, experiencing neither 1 point higher game need satisfaction (β = `r h2a_day_est`) nor 1 point higher global need frustration (β = `r h2b_day_est`) than usual on a 1-point scale showed meaningful associations with the likelihood of subsequent play (see @fig-h2-predictions). 
+Results support neither H2a or H2b: at the day level, experiencing neither 1 point higher game need satisfaction (B = `r h2a_day_est`) nor 1 point higher global need frustration (B = `r h2b_day_est`) than usual on a 7-point scale showed meaningful associations with the likelihood of subsequent play (see @fig-h2-predictions). 
 
-We conducted a wide range of sensitivity analyses providing convergent conclusions: key estimates for gaming need satisfaction (game NS) and global need frustration (global NF) remain indistinguishable from 0 in models that:
+We conducted a wide range of sensitivity analyses providing convergent conclusions. key estimates for gaming need satisfaction (game NS) and global need frustration (global NF) remain indistinguishable from 0 in models that:
 
-- use subsequent 6 hours (game NS: β = 0.04; global NF: β = -0.01) or 12 hours (game NS: β = 0.04; global NF: β = -0.02) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
-- use alternative random slopes specifications (game NS: β = 0.04; global NF: β = -0.06) (Sensitivity Analysis 2)
-- use a count model of minutes played in the subsequent 24 hours instead of binary play/no-play (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 3)
-- use complete case data instead of imputed data (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 4)
-- impute data from the full eligible sample instead of the analytic sample (game NS: β = 0.04; global NF: β = -0.08) (Sensitivity Analysis 5)
-- include an interaction between gaming need satisfaction and global need frustration (game NS: β = 0.04; global NF: β = -0.08; game NS * global NF: β = 0.04) (Sensitivity Analysis 6)
+- use subsequent 6 hours (game NS: B = 0.04; global NF: B = -0.01) or 12 hours (game NS: B = 0.04; global NF: B = -0.02) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
+- use alternative random slopes specifications (game NS: B = 0.04; global NF: B = -0.06) (Sensitivity Analysis 2)
+- use a count model of minutes played in the subsequent 24 hours instead of binary play/no-play (game NS: B = 0.04; global NF: B = -0.08) (Sensitivity Analysis 3)
+- use complete case data instead of imputed data (game NS: B = 0.04; global NF: B = -0.08) (Sensitivity Analysis 4)
+- impute data from the full eligible sample instead of the analytic sample (game NS: B = 0.04; global NF: B = -0.08) (Sensitivity Analysis 5)
+- include an interaction between gaming need satisfaction and global need frustration (game NS: B = 0.04; global NF: B = -0.08; game NS * global NF: B = 0.04) (Sensitivity Analysis 6)
 - use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 7)
 - enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 8)
 
-The 30-day aggregate associations (game need satisfaction: β = `r h2a_agg_est`; global need frustration: β = `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics. 
+The 30-day aggregate associations (game need satisfaction: B = `r h2a_agg_est`; global need frustration: B = `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics. 
 
 In short, results consistently fail to detect an association between situational need satisfaction or global need frustration and subsequent play behavior.
 
@@ -2358,9 +2787,9 @@ ggplot(h3_data, aes(x = x_numeric, y = global_ns)) +
 
 Participants reported what activity their gaming session displaced `r total_responses` times across the study. In `r n_core` cases (`r pct_core`%), gaming displaced a core life domain: sleep, eating, or fitness (*n* = `r n_sleep`), social engagements (*n* = `r n_social`), work or school (*n* = `r n_work`), or caretaking (*n* = `r n_caretaking`). Gaming most commonly displaced non-core activities such as other digital media use (*n* = `r n_digital_media`) and other leisure activities (*n* = `r n_other_leisure`).
 
-Results provide very weak support for H3 (β = `r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions).
+Results provide very weak support for H3 (B = `r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions).
 
-An exploratory analysis (Appendix Sensitivity Analysis 10) examined whether this relationship differed for specific displaced life domains. Results showed that need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. We return to this in the discussion. 
+An exploratory analysis (Appendix Sensitivity Analysis 10) examined whether this relationship differed for specific displaced life domains. Results showed that need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
 
 ```{r}
 #| label: tbl-main-results
@@ -2373,8 +2802,9 @@ h1_combined <- summary(h1_pooled) |>
   filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
   select(term, estimate, std.error, statistic, p.value) |>
   mutate(
-    Model = "H1: game NS → global NS",
-    term = ifelse(term %in% names(labels), labels[as.character(term)], term),
+    Hypothesis = glue(
+      "{labels[str_remove(term, '_cw$')]} → global need satisfaction"
+    ),
     test_stat = "t"
   )
 
@@ -2383,8 +2813,7 @@ h2_combined <- summary(h2_pooled) |>
   filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
   select(term, estimate, std.error, statistic, p.value) |>
   mutate(
-    Model = "H2: game NS + global NF → play",
-    term = ifelse(term %in% names(labels), labels[term], term),
+    Hypothesis = glue("{labels[str_remove(term, '_cw$')]} → play"),
     test_stat = "z"
   )
 
@@ -2393,8 +2822,7 @@ h3_combined <- summary(h3_pooled) |>
   filter(term != "(Intercept)") |>
   select(term, estimate, std.error, statistic, p.value) |>
   mutate(
-    Model = "H3: displaced core → global NS",
-    term = ifelse(term %in% names(labels), labels[term], term),
+    Hypothesis = "Displaced core domain → global need satisfaction",
     test_stat = "t"
   )
 
@@ -2410,8 +2838,7 @@ bind_rows(h1_combined, h2_combined, h3_combined) |>
     test_result = glue("{statistic} ({test_stat})")
   ) |>
   select(
-    Model,
-    Parameter = term,
+    Hypothesis,
     Estimate = estimate,
     SE = std.error,
     `Statistic` = test_result,
@@ -2419,203 +2846,12 @@ bind_rows(h1_combined, h2_combined, h3_combined) |>
   ) |>
   tt() |>
   style_tt(fontsize = 0.7) |>
-  style_tt(i = 0, bold = TRUE) |>
-  group_tt(j = "Model")
+  style_tt(i = 0, bold = TRUE)
 ```
 
-# Study 2: Exploratory Evidence from PowerWash Simulator
+# Study B: Exploratory Evidence from PowerWash Simulator
 
-```{r}
-#| label: study2-data-download
-#| code-summary: "Show code (Download PWS data from OSF)"
-
-# Download PWS data from OSF
-path_pws <- "data/pws/pws_data.zip"
-if (!file.exists(path_pws)) {
-  dir.create("data/pws", showWarnings = FALSE, recursive = TRUE)
-  download.file(
-    url = "https://osf.io/download/j48qf/",
-    destfile = path_pws
-  )
-}
-
-# Extract only the study_prompt_answered.csv file we need
-if (!file.exists("data/pws/study_prompt_answered.csv")) {
-  unzip(
-    zipfile = path_pws,
-    files = "data/study_prompt_answered.csv",
-    exdir = "data/pws",
-    junkpaths = TRUE
-  )
-}
-```
-
-```{r}
-#| label: study2-data-prep
-#| code-summary: "Show code (Prepare PWS session data)"
-
-if (!file.exists("data/pws/pws_sessions.csv")) {
-  # Load and process prompts
-  pws_raw <- read_csv(
-    "data/pws/study_prompt_answered.csv",
-    col_select = c(
-      pid,
-      time = Time_utc,
-      duration = CurrentSessionLength,
-      prompt = LastStudyPromptType,
-      response
-    ),
-    show_col_types = FALSE
-  ) |>
-    mutate(
-      pid = factor(pid),
-      response = response / 100
-    ) |>
-    arrange(pid, time) |>
-    mutate(
-      # Calculate time since last prompt in minutes
-      time_since_last = as.numeric(
-        difftime(
-          time,
-          lag(time, 1, default = as_datetime("1970-01-01")),
-          units = "mins"
-        )
-      ),
-      # New session if gap > 30 minutes
-      new_session = time_since_last > 30,
-      session = cumsum(new_session),
-      .by = pid
-    ) |>
-    select(-time_since_last)
-
-  # Save prompt-level data for troubleshooting (includes all prompt times)
-  pws_prompts_detail <- pws_raw |>
-    select(-new_session) |>
-    group_by(pid, session) |>
-    filter(n() > 1) |>
-    mutate(
-      prompt_time = time,
-      first_time = first(time),
-      first_duration = first(duration),
-      startTime = if_else(
-        first_duration < 15,
-        first_time - first_duration * 60,
-        first_time
-      ),
-      startTime = min(startTime),
-      endTime = max(time),
-      sessionLength = round(as.integer(endTime - startTime) / 60, 2)
-    ) |>
-    ungroup() |>
-    select(
-      pid,
-      session,
-      prompt_time,
-      prompt,
-      response,
-      duration,
-      startTime,
-      endTime,
-      sessionLength
-    )
-
-  # Summarize for analysis
-  pws_prompts <- pws_raw |>
-    select(-new_session) |>
-    group_by(pid, session) |>
-    filter(n() > 1) |>
-    mutate(
-      first_time = first(time),
-      first_duration = first(duration),
-      startTime = if_else(
-        first_duration < 15,
-        first_time - first_duration * 60,
-        first_time
-      ),
-      startTime = min(startTime),
-      endTime = max(time)
-    ) |>
-    select(-first_time, -first_duration) |>
-    group_by(pid, session, prompt) |>
-    summarise(
-      numPrompts = n(),
-      mean = mean(response, na.rm = TRUE),
-      startTime = first(startTime),
-      endTime = first(endTime),
-      .groups = "drop"
-    ) |>
-    mutate(
-      sessionLength = round(as.integer(endTime - startTime) / 60, 2),
-      mean = ifelse(is.nan(mean), NA_real_, mean)
-    )
-
-  # Convert to wide format
-  pws_wide <- pws_prompts |>
-    filter(sessionLength > 5 & sessionLength < 480) |>
-    pivot_wider(
-      id_cols = c(pid, session, startTime, endTime, sessionLength),
-      names_from = prompt,
-      values_from = c(numPrompts, mean),
-      names_sort = TRUE
-    ) |>
-    select(-contains("_NA")) |>
-    janitor::clean_names() |>
-    group_by(pid) |>
-    mutate(
-      session_gap = lead(start_time, 1) - end_time,
-      session_gap = round(as.integer(session_gap) / 60 / 60, 2),
-      prev_session_length = lag(session_length, 1),
-      prev_session_gap = lag(session_gap, 1),
-      # Combine autonomy and competence into game need satisfaction
-      game_ns = (mean_autonomy + mean_competence) / 2,
-      # Calculate person means
-      game_ns_pm = mean(game_ns, na.rm = TRUE),
-      session_length_pm = mean(session_length, na.rm = TRUE),
-      session_gap_pm = mean(session_gap, na.rm = TRUE)
-    ) |>
-    ungroup() |>
-    # Calculate grand means and centered values
-    mutate(
-      game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
-      session_length_gm = mean(session_length_pm, na.rm = TRUE),
-      session_gap_gm = mean(session_gap_pm, na.rm = TRUE),
-      # Within-person centered (deviation from person mean)
-      game_ns_cw = game_ns - game_ns_pm,
-      session_length_cw = session_length - session_length_pm,
-      session_gap_cw = session_gap - session_gap_pm,
-      # Between-person centered (person mean - grand mean)
-      game_ns_cb = game_ns_pm - game_ns_gm,
-      session_length_cb = session_length_pm - session_length_gm,
-      session_gap_cb = session_gap_pm - session_gap_gm
-    ) |>
-    select(
-      pid,
-      session,
-      session_length,
-      session_gap,
-      prev_session_length,
-      prev_session_gap,
-      everything()
-    )
-
-  write_csv(pws_wide, "data/pws/pws_sessions.csv")
-  write_csv(pws_prompts_detail, "data/pws/pws_prompts_detail.csv")
-} else {
-  pws_wide <- read_csv("data/pws/pws_sessions.csv", show_col_types = FALSE)
-  pws_prompts_detail <- read_csv(
-    "data/pws/pws_prompts_detail.csv",
-    show_col_types = FALSE
-  )
-}
-
-# Store sample size for inline reporting
-pws_n_players <- length(unique(pws_wide$pid))
-pws_n_sessions <- nrow(pws_wide)
-pws_n_players_fmt <- scales::comma(pws_n_players)
-pws_n_sessions_fmt <- scales::comma(pws_n_sessions)
-```
-
-## Study 2 Method
+## Study B Method
 
 To assess whether our findings generalize beyond the Open Play dataset, we conducted a secondary analysis of data from *PowerWash Simulator* (PWS) [@VuorreEtAl2023intensivea]. PWS is a first-person simulation game where players use pressure washers to clean various objects. The PWS dataset complements the Open Play data because it is highly granular: players were prompted during gameplay to rate their experiences of autonomy, competence, focus, wellbeing, immersion, and enjoyment on 0-100 scales, on average once every 10 minutes throughout a play session. We linked these ratings to play behavior extracted from game logs.
 
@@ -2623,17 +2859,17 @@ The original study procedures were granted ethical approval by Oxford University
 
 ### Participants
 
-The characteristics of the full sample of 11,080 players in the PWS dataset are described in @VuorreEtAl2023intensivea; here, we briefly describe the subset of data relevant to our questions. All participants were over 18 years old, provided informed consent, answered at least one mood question, and did not request their data to be deleted. The median age was 27 (19, 40; 1st and 9th deciles), and the four most frequent gender responses were Male (4,537, 52.2%), Female (2,675, 30.8%), Non-binary (723, 8.3%), and Transgender (326, 3.7%). Participants were resident in 39 countries, with the USA (4,917, 56.5%), UK (840, 9.7%), Canada (448, 5.2%), and Germany (390, 4.5%) being the most represented. Recruitment happened in multiple waves through multiple avenues inside and outside of the game. Study participation was incentivized through cosmetic in-game rewards (e.g., item skins). 
+The characteristics of the full sample of 11,080 players in the PWS dataset are described in @VuorreEtAl2023intensivea; here, we briefly describe the subset of data relevant to our questions. All participants in the original study were over 18 years old and provided informed consent; for inclusion in Study B here participants also needed to have answered at least one mood prompt. The median age was 27 (19, 40; 1st and 9th deciles), and the four most frequent gender responses were Male (4,537, 52.2%), Female (2,675, 30.8%), Non-binary (723, 8.3%), and Transgender (326, 3.7%). Participants were resident in 39 countries, with the USA (4,917, 56.5%), UK (840, 9.7%), Canada (448, 5.2%), and Germany (390, 4.5%) being the most represented. Recruitment happened in multiple waves through multiple avenues inside and outside of the game. Study participation was incentivized through cosmetic in-game rewards (e.g., item skins). 
 
 ### Measures
 
 *Play sessions* were defined as continuous periods of activity separated by gaps in engagement of at least 30 minutes, yielding `r pws_n_sessions_fmt` sessions across `r pws_n_players_fmt` players. Based on the session timestamps, we calculated two behavioral outcomes: session length (minutes) and session gap (hours; defined as the end timestamp of the previous session and the start timestamp of the subsequent one). 
 
-*Need satisfaction* was measured via two in-game prompts on a visual analogue scale from 0 to 100: an autonomy item "Just now, I was doing the things I really wanted to in Powerwash Simulator” and a competence item "Just now, I felt competent playing PowerWash Simulator", each with visual analogue scale endpoints "Not at all" and "As much as possible". We converted each observation to a 1--10 scale for interpretability. For each session, we took the mean of all autonomy and competence ratings to generate a single need satisfaction indicator (analogously to Study 1) and decomposed it into within- and between-person components.
+*Need satisfaction* was measured via two in-game prompts on a visual analogue scale from 0 to 100: an autonomy item "Just now, I was doing the things I really wanted to in Powerwash Simulator” and a competence item "Just now, I felt competent playing PowerWash Simulator", each with visual analogue scale endpoints "Not at all" and "As much as possible". We converted each observation to a 1--7 scale to match Study A's BANGS items. For each session, we took the mean of all autonomy and competence ratings to generate a single need satisfaction indicator (analogously to Study A) and decomposed it into within- and between-person components.
 
 ### Analysis Approach
 
-Analogously to study 1, we estimated the relationship between need satisfaction and outcomes (session length, session gap) using linear mixed effects models, with random intercepts and slopes for each participant. Outcomes were log-transformed due to heavily right-skewed distributions. Following our main analysis approach, we decomposed need satisfaction predictors into within- and between-person components and controlled for previous session length and session gap to isolate need satisfaction effects.
+Analogously to Study A, we estimated the relationship between need satisfaction and outcomes (session length, session gap) using linear mixed effects models, with random intercepts and slopes for each participant. Outcomes were log-transformed due to heavily right-skewed distributions. Following our main analysis approach, we decomposed need satisfaction predictors into within- and between-person components and controlled for previous session length and session gap to isolate need satisfaction effects.
 
 ```{r}
 #| label: study2-models
@@ -2663,7 +2899,7 @@ pred_m1 <- predictions(
   pws_m1,
   newdata = datagrid(
     model = pws_m1,
-    game_ns_cw = c(0, 9),
+    game_ns_cw = c(0, 6),
     game_ns_cb = 0,
     prev_session_length = mean(pws_wide$prev_session_length, na.rm = TRUE)
   ),
@@ -2696,7 +2932,7 @@ pred_m2 <- predictions(
   pws_m2,
   newdata = datagrid(
     model = pws_m2,
-    game_ns_cw = c(0, 9),
+    game_ns_cw = c(0, 6),
     game_ns_cb = 0,
     prev_session_gap = mean(pws_wide$prev_session_gap, na.rm = TRUE)
   ),
@@ -2729,16 +2965,15 @@ pws_m1_est <- report_lmer_term(pws_m1, "game_ns_cw", p_method = "wald_z")
 pws_m2_est <- report_lmer_term(pws_m2, "game_ns_cw", p_method = "wald_z")
 
 game_ns_sd <- number(sd(pws_wide$game_ns_cw, na.rm = TRUE), .01)
-
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
 
 ```{r}
 #| label: fig-study2-results
-#| fig-cap: "Relationship between session-to-session fluctuations in need satisfaction and play behavior in PowerWash Simulator. (A) Session length. (B) Time to next session. Shaded regions show 95% confidence intervals."
+#| fig-cap: "Relationship between session-to-session fluctuations in need satisfaction and play behavior in PowerWash Simulator. (A) Session length. (B) Time to next session. Shaded regions show 95% confidence intervals. The x-axis spans the largest observed positive and negative within-person deviations in need satisfaction."
 #| code-summary: "Show code (Visualize PWS relationships)"
-#| fig-asp: 0.4
+#| fig-asp: 0.36
 
 # Generate predictions for session length
 pred_m1 <- marginaleffects::predictions(
@@ -2827,19 +3062,19 @@ p_m1 +
 
 :::
 
-## Study 2 Results: Exploratory
+## Study B Results: Exploratory
 
-Results are shown in @fig-study2-results. At the session level, game need satisfaction showed a very weak association with session length (β = `r pws_m1_est`). Panel A illustrates that when players experienced higher need satisfaction than their personal average, they did not play meaningfully longer: if a player who typically reported need satisfaction of 1 instead reported a 10, their expected change in session length would be only `r pws_m1_max_eff`.
+Results are shown in @fig-study2-results. At the session level, game need satisfaction showed a very weak association with session length (B = `r pws_m1_est`). Panel A illustrates that when players experienced higher need satisfaction than their personal average, they did not play meaningfully longer: if a player who typically reported need satisfaction of 1 instead reported a 7, their expected change in session length would be only `r pws_m1_max_eff`.
 
-Similarly, game need satisfaction showed a weak association with time to next session (β = `r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 10, their next session would begin `r pws_m2_max_eff` sooner than usual. While this association is significant, given that typical session-to-session deviations in need satisfaction are much smaller (within-person SD = `r game_ns_sd` points), we interpret the practical relevance to behavior as small. It remains an open question how these motivational factors may influence collective human behavior on the games or games platform levels of analysis.
+Similarly, game need satisfaction showed a weak association with time to next session (B = `r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 7, their next session would begin `r pws_m2_max_eff` sooner than usual. While this association is significant, given that typical session-to-session deviations in need satisfaction are much smaller (within-person SD = `r game_ns_sd` points), we interpret the practical relevance to behavior as small. It remains an open question how these motivational factors may influence collective human behavior on the games or games platform levels of analysis.
 
-Broadly, results therefore converge with Study 1: Despite examining `r pws_n_sessions_fmt` sessions from `r pws_n_players_fmt` players in a different game using different measures, the pattern of weak behavioral associations replicated. Full model outputs are provided in the Appendix (@tbl-full-study2).
+Broadly, results therefore converge with Study A: Despite examining `r pws_n_sessions_fmt` sessions from `r pws_n_players_fmt` players in a different game using different measures, the pattern of weak behavioral associations replicated. Full model outputs are provided in the Appendix (@tbl-full-study2).
 
 # Discussion
 
-Across Study 1 and Study 2, our findings reveal a consistent pattern: basic psychological needs---whether satisfied in games or frustrated in daily life---show weak or null relationships with subsequent gaming behavior. This apparent disconnect between self-reported and behavioral outcomes has important implications. Self-determination theory, particularly as applied to games, has been extensively validated using self-report measures. Players who report higher need satisfaction also report greater enjoyment, stronger intentions to continue playing, and better wellbeing outcomes [@TyackMekler2020Selfdetermination]; @AdinolfTurkay2019differences; @OliverEtAl2016video; @TamboriniEtAl2011Media; @FormosaEtAl2022Need; @TyackEtAl2020Restorative]. Our results do not challenge these relationships. Rather, they suggest that for individual players, the pathway from needs to actual behavior may be substantially weaker or more complex than the pathway from needs to self-reported experiences and intentions.
+Across Study A and Study B, our findings reveal a consistent pattern: basic psychological needs---whether satisfied in games or frustrated in daily life---show weak or null relationships with subsequent gaming behavior. This apparent disconnect between self-reported and behavioral outcomes has important implications. Self-determination theory, particularly as applied to games, has been extensively validated using self-report measures. Players who report higher need satisfaction also report greater enjoyment, stronger intentions to continue playing, and better wellbeing outcomes [@TyackMekler2020Selfdetermination]; @AdinolfTurkay2019differences; @OliverEtAl2016video; @TamboriniEtAl2011Media; @FormosaEtAl2022Need; @TyackEtAl2020Restorative]. Our results do not challenge these relationships. Rather, they suggest that for individual players, the pathway from needs to actual behavior may be substantially weaker or more complex than the pathway from needs to self-reported experiences and intentions.
 
-Our findings are not the first to report weak links between basic needs and gaming engagement as measured by digital trace data. Motivation was only very weakly associated with total engagement in *League of Legends* [@BruhlmannEtAl2020Motivational]. Competence satisfaction did not meaningfully relate to voluntary engagement in a custom RPG [@KaoEtAl2024How], and satisfaction of all three needs was only very weakly related to playtime in Animal Crossing: New Horizons and Plants vs Zombies: Battle for Neighborville over a 2-week timescale (r = .07, likely too small to be practically significant) [@JohannesEtAl2021Video]. We add to these findings with more comprehensive trace data (spanning 5 platforms in Study 1 and detailed single-game records in Study 2) and higher-frequency wellbeing data. Given accumulating weak links between needs and behavior, we suggest several paths forward.
+Our findings are not the first to report weak links between basic needs and gaming engagement as measured by digital trace data. Motivation was only very weakly associated with total engagement in *League of Legends* [@BruhlmannEtAl2020Motivational]. Competence satisfaction did not meaningfully relate to voluntary engagement in a custom RPG [@KaoEtAl2024How], and satisfaction of all three needs was only very weakly related to playtime in Animal Crossing: New Horizons and Plants vs Zombies: Battle for Neighborville over a 2-week timescale (r = .07, likely too small to be practically significant) [@JohannesEtAl2021Video]. We add to these findings with more comprehensive trace data (spanning 5 platforms in Study A and detailed single-game records in Study B) and higher-frequency wellbeing data. Given accumulating weak links between needs and behavior, we suggest several paths forward.
 
 ## Implications for the BANG model
 
@@ -2857,7 +3092,7 @@ A wholesale revision of BANG is beyond the scope of the current paper, but our r
 
 The modest associations we found between need experiences and subsequent play behavior suggest that basic psychological needs may not be the primary drivers of short-term gaming engagement. In light of this, we suggest player experience research consider other theoretical frameworks that might provide better or complementary explanations for short-term gaming engagement. We are aware of least three such frameworks.  
 
-Behaviorist and reinforcement-learning accounts emphasize the power of recent rewards and environmental cues, rather than subjective motives, in sustaining behavior [@Skinner1965Science; @Niv2009Reinforcement]. Recent work has expanded and adapted these predictions for the digital media domain [@NorwoodPrzybylski2025new; @JamesTunney2017relationship; @JamesTunney2017need]. Under such models, a primary cause of players re-engaging is that the behavior has been reliably reinforced, not because they recently felt more autonomy, competence, or relatedness. 
+Behaviorist and reinforcement-learning accounts emphasize the power of recent rewards and environmental cues, rather than subjective motives, in sustaining behavior [@Skinner1965Science; @Niv2009Reinforcement]. Recent work has expanded and adapted these predictions for the digital media domain [@NorwoodEtAl2026Digital; @JamesTunney2017relationship; @JamesTunney2017need]. Under such models, a primary cause of players re-engaging is that the behavior has been reliably reinforced, not because they recently felt more autonomy, competence, or relatedness. 
 
 Habit theory similarly predicts minimal coupling between momentary experiences and action. With sufficient repetition in stable contexts, gaming becomes cue-triggered and automatic, guided by procedural memory rather than conscious motivational states [@OuelletteWood1998Habit; @WoodRunger2016Psychology]. If players typically launch games at particular times or in response to specific cues, need fluctuations may exert little incremental influence over behavior.
 
@@ -2885,7 +3120,7 @@ Second, our test of displacement (H3) relies on a hypothetical counterfactual me
 
 Third, the behavioral outcomes examined here reflect short-term engagement patterns, such as session length and return latency. Null or weak associations at this timescale do not rule out need-related effects on longer-term outcomes, such as game choice, persistence over months, or disengagement trajectories. Our conclusions are therefore limited to short-term behavioral dynamics and should not be generalized to all forms of gaming involvement.
 
-Fourth, while the Study 1 data represent a substantial advancement in capturing comprehensive multi-platform data, they are nonetheless incomplete: players in our sample may have played games on Playstation, played third-party games on Nintendo, or played on mobile (which, while captured, was not captured in sufficient temporal resolution to inform the hypotheses here). Methods for reliably capturing data from each gaming platform require further development.
+Fourth, while the Study A data represent a substantial advancement in capturing comprehensive multi-platform data, they are nonetheless incomplete: players in our sample may have played games on Playstation, played third-party games on Nintendo, or played on mobile (which, while captured, was not captured in sufficient temporal resolution to inform the hypotheses here). Methods for reliably capturing data from each gaming platform require further development.
 
 Finally, our sample, although purposively sampled for racial and gender diversity, should be understood as consisting of engaged 18--40 year old players willing to share detailed behavioral data and complete intensive surveys, rather than as representative of all players. This selectivity limits generalizability in two ways. First, casual players, younger adolescents, and individuals with minimal or highly irregular play patterns are underrepresented. Second, highly engaged players' behavior may differ systematically from those among less engaged populations (e.g,more routinized or more highly habit-driven). The weak need–behavior associations observed here may not generalize to all player groups, nor do they preclude stronger effects in populations with greater variability in motivation or fewer structural constraints.
 
@@ -2922,6 +3157,76 @@ Data-sharing partners had no role in the design, analysis, or publication of res
 #show: appendix.with(prefix: "A")
 ```
 # Appendix
+
+## Design Table
+
+The following is the Design Table from the Stage 1 Registered Report [@BallouEtAl2025Psychological], reproduced verbatim with the addition of an Observed Outcome column. 
+
+```{r}
+#| label: tbl-design
+#| tbl-cap: "Study A design table"
+#| code-summary: "Show code (Design table)"
+
+tibble(
+  `Research Question` = c(
+    "Does in-game need satisfaction contribute to overall need satisfaction?",
+    "Do positive play experiences result in more frequent future play behavior?",
+    "Do players compensate for frustrated needs using games?",
+    "Is the displacement of core life domains more associated with harm than non-core domains?"
+  ),
+  Hypothesis = c(
+    "H1. When individuals' in-game needs are better satisfied, they report greater global need satisfaction.",
+    "H2a. When individuals' in-game need satisfaction is higher, they are more likely to play video games in the 24-hour period after survey completion.",
+    "H2b. When individuals' global need frustration is higher, they are more likely to play video games in the 24-hour period after survey completion.",
+    "H3. When a person's most recent gaming displaced a core life domain (work/school, social engagements, sleep/eating/fitness, or caretaking), their global need satisfaction will be lower."
+  ),
+  `Sampling Plan` = c(
+    "1,000 US adults, completing a diary study over 30 days. The hypotheses in Study A are better-suited to the diary study data, and therefore do not use the panel data (and by extension, the UK sample). The telemetry data in Study A consists of Xbox, Nintendo, and Steam.",
+    "",
+    "",
+    ""
+  ),
+  `Analysis Plan†` = c(
+    "Multilevel within-between linear regression whereby within-person centered game-level need satisfaction (gameNS_cw) predicts deviation from a person's typical global need satisfaction (globalNS). glmmTMB(globalNS ~ gameNS_cw + gameNS_cb + (1 + gameNS_cw | pid) + ar1(day + 0 | pid))",
+    "Multilevel logistic regression with the binary presence or absence of playtime in the subsequent 24 hours from survey completion as the outcome (playedLater), predicted by within-person centered in-game need satisfaction (gameNS_cw; H2a) and global need frustration (globalNF_cw; H2b). glmmTMB(playedLater ~ gameNS_cw + gameNS_cb + globalNF_cw + globalNF_cb + (1 + gameNS_cw + globalNF_cw | pid) + ar1(day + 0 | pid), family = binomial(link = \"logit\"))",
+    "",
+    "Multilevel linear regression predicting global need satisfaction (globalNS) from the presence or absence of the player's most recent gaming session having displaced a core life domain (displacedCoreDomain). glmmTMB(globalNS ~ displacedCoreDomain + (1 + displacedCoreDomain | pid) + ar1(day + 0 | pid))"
+  ),
+  `Rationale for deciding the sensitivity of the test for confirming or disconfirming the hypothesis` = c(
+    "We did not conduct an a priori power analysis, as resource constraints dictated the maximum sample we could collect. The complexity of the data structure and lack of prior information about within-person playtime variance across days, effect size expectations, or meaningful smallest effect sizes of interests (SESOIs). Instead, we used simulated data to establish the approximate precision with which coefficients will eventually be estimated. In our assessment, these are sufficiently precise to be valuable and to differentiate statistical vs practical significance (see column right), but we leave further judgement to the reader.",
+    "",
+    "",
+    ""
+  ),
+  `Interpretation given different outcomes` = c(
+    "We will only interpret results subject to the data meeting the relevant positive controls specified: (1) a significant positive correlation between self-reported playtime and digital trace playtime, (2) no overlapping game sessions for a given individual on a particular platform, and (3) a significant positive correlation between global need satisfaction and life satisfaction. We will use statistical significance to determine whether the results support (p < .05) or fail to support (p > .05) the hypothesis. However, much greater emphasis will be placed on marginal outcomes, which we will contextualize in real-world terms so as to let readers make judgements about whether any statistically significant results are also practically significant.",
+    "",
+    "",
+    ""
+  ),
+  `Theory that could be shown wrong by the outcomes` = c(
+    "H6 in BANG",
+    "H8 in BANG",
+    "H9 in BANG",
+    "H5 in BANG"
+  ),
+  `Observed Outcome` = c(
+    "Supported; in-game need satisfaction was positively related to global need satisfaction.",
+    "Unsupported; in-game need satisfaction was not related to probability of play in the subsequent 24 hours.",
+    "Unsupported; global need frustration was not related to probability of play in the subsequent 24 hours.",
+    "Unsupported; self-reported displacement of a core life domain was not associated with lower global need satisfaction."
+  )
+) |>
+  tt(
+    notes = "†All multilevel models in Study A include random slopes and intercepts by participant (pid) for the predictor of interest, and an AR(1) autocorrelation structure for outcome measures. Between-person centered predictors (†\\_cb) are included for debiasing the within-person coefficient of interest, but are not used as part of the primary hypothesis test."
+  ) |>
+  style_tt(i = 1, j = 3, rowspan = 4, alignv = "m") |>
+  style_tt(i = 1, j = 5, rowspan = 4, alignv = "m") |>
+  style_tt(i = 1, j = 6, rowspan = 4, alignv = "m") |>
+  style_tt(i = 2, j = 4, rowspan = 2, alignv = "m") |>
+  style_tt(fontsize = 0.7) |>
+  style_tt(i = 0, bold = TRUE)
+```
 
 ## Full Model Outputs
 
@@ -3006,7 +3311,6 @@ modelsummary(
 ) |>
   style_tt(fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
-
 ```
 
 ### H3: Displacing core domains is associated with lower global need satisfaction
@@ -3034,14 +3338,14 @@ modelsummary(
   style_tt(i = 0, bold = TRUE)
 ```
 
-### Study 2: Game need satisfaction and play behavior in PowerWash Simulator
+### Study B: Game need satisfaction and play behavior in PowerWash Simulator
 
 ```{r}
 #| label: tbl-full-study2
-#| tbl-cap: "Study 2: Complete model summaries for game NS → play behavior"
-#| code-summary: "Show code (Full Study 2 model output)"
+#| tbl-cap: "Study B: Complete model summaries for game NS → play behavior"
+#| code-summary: "Show code (Full Study B model output)"
 
-# Create model summaries for both Study 2 models
+# Create model summaries for both Study B models
 modelsummary(
   list(
     "Session Length" = pws_m1,
@@ -3092,7 +3396,6 @@ daily_imputed |>
   facet_wrap(~variable, scales = "free", nrow = 1) +
   labs(color = NULL, x = "Value", y = "Density") +
   theme(legend.position = "bottom")
-
 ```
 
 ## Sensitivity Analyses
@@ -3101,7 +3404,7 @@ We conducted several sensitivity analyses to assess the robustness of our findin
 
 ### S1: Temporal window robustness
 
-Testing whether the temporal window affects results. The main analysis used 24 hours post-survey. Here we test: (a) 12 hours post-survey, (b) 6 hours post-survey, and (c) 24 hours pre-survey (reverse temporal ordering to test bidirectionality).
+Testing whether the temporal window affects results of H2a (game need satisfation) and H2b (global need frustration). The main analysis used 24 hours post-survey. Here we test: (a) 24 hours pre-survey (reverse temporal ordering to test bidirectionality), (b) 6 hours post-survey, (c) 12 hours post-survey, and (d) 24 hours post-survey (preregistered analysis).
 
 ```{r}
 #| label: s1-12h-model
@@ -3236,10 +3539,10 @@ if (file.exists(sens1c_cache_file) && file.exists(sens1c_pooled_file)) {
 
 # Combine all results
 bind_rows(
-  clean_results(h2_pooled, "24h post"),
-  clean_results(sens1_pooled, "12h post"),
+  clean_results(sens1c_pooled, "24h pre"),
   clean_results(sens1b_pooled, "6h post"),
-  clean_results(sens1c_pooled, "24h pre")
+  clean_results(sens1_pooled, "12h post"),
+  clean_results(h2_pooled, "24h post")
 ) |>
   pivot_wider(
     names_from = window,
@@ -3251,6 +3554,8 @@ bind_rows(
   style_tt(fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
+
+Results indicate that shorter windows post-survey are still unassociated with play likelihood, but that video game play is more likely in the day preceding a report of high in-game need satisfaction or high general need frustration. 
 
 ### S2: Random effects specification robustness
 
@@ -3453,9 +3758,11 @@ bind_rows(h2_simple, h2a_est, h2b_est, sens2_est) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
+All results vary minimally and can be considered robust to the decision to drop random slopes from the main models.  
+
 ### S3: Play volume (continuous outcome)
 
-Testing whether the predictors have a linear association with play volume in minutes, rather than binary play occurrence. Uses Gaussian family for continuous outcome.
+Here we test whether the predictors have a linear association with play volume in minutes, rather than binary play occurrence.
 
 ```{r}
 #| label: s3-playvolume-model
@@ -3528,21 +3835,23 @@ summary(sens3_pooled) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
-### S4: Complete cases only (no imputation)
 
-Testing whether multiple imputation introduced bias. Main analysis used MICE with PMM; here we analyze only complete cases.
+
+### S4: Sample construction and imputation robustness
+
+The primary H2 analysis rests on a few choices about how the analytic sample was built: a non-preregistered ≥15 completed-surveys inclusion threshold, and multiple imputation (M=27) restricted to that analytical sample rather than all eligible participants (the preregistered approach). Here we test whether the H2a/H2b estimates depend on these choices by refitting the model under complete cases only (no imputation), the ≥15-wave threshold swept across a range of plausible cutoffs (10-24 completed surveys), and imputation of the full eligible sample rather than just the analytical sample.
 
 ```{r}
 #| label: s4-complete-model
 #| output: false
-#| code-summary: "Show code (S4: Fit models on complete cases only)"
+#| code-summary: "Show code (S4: Fit model on complete cases only)"
 
 # File-based caching to avoid re-running across multiple output formats
-sens4_cache_file <- "data/models/sens4_fit.rds"
+sens4_cache_file <- "data/models/sens4_pooled.rds"
 
 if (file.exists(sens4_cache_file)) {
-  message("Loading cached S4 model fit")
-  sens4_fit <- readRDS(sens4_cache_file)
+  message("Loading cached S4 pooled model")
+  sens4_pooled <- readRDS(sens4_cache_file)
 } else {
   message("Fitting S4 model...")
 
@@ -3571,43 +3880,22 @@ if (file.exists(sens4_cache_file)) {
     ziformula = ~0
   )
 
+  # Complete cases has no missing data to impute, so pooling M identical
+  # fits via mice::pool() reproduces the same estimate/SE as the single fit
+  # (only the Rubin's-rules df differs slightly). Done so this specification
+  # yields the same pooled-summary structure as every other row below.
+  sens4_pooled <- pool(rep(list(sens4_fit), 10))
+
   # Save to cache
-  saveRDS(sens4_fit, sens4_cache_file)
+  saveRDS(sens4_pooled, sens4_cache_file)
   message("S4 model saved to cache")
 }
 ```
 
 ```{r}
-#| label: tbl-s4-results
-#| tbl-cap: "S4: H2 with complete cases only (no imputation)"
-#| code-summary: "Show code (Create S4 results table)"
-
-summary(sens4_fit)$coefficients$cond |>
-  as_tibble(rownames = "term") |>
-  filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
-  select(term, Estimate, `Std. Error`, `z value`, `Pr(>|z|)`) |>
-  mutate(
-    term = ifelse(term %in% names(labels), labels[term], term),
-    across(c(Estimate, `Std. Error`, `z value`), ~ round(.x, 3)),
-    `Pr(>|z|)` = case_when(
-      `Pr(>|z|)` < 0.001 ~ "<.001",
-      TRUE ~ as.character(round(`Pr(>|z|)`, 3))
-    )
-  ) |>
-  rename(Parameter = term, SE = `Std. Error`, z = `z value`, p = `Pr(>|z|)`) |>
-  tt() |>
-  style_tt(fontsize = 0.7) |>
-  style_tt(i = 0, bold = TRUE)
-```
-
-### S5: Full sample imputation (preregistered approach)
-
-Main analysis imputed analytical sample only (≥15 waves, N = 555) for statistical soundness. Preregistration specified imputing all participants. Here we implement that approach for comparison, though note that imputing 80%+ missing data for sparse participants is statistically questionable.
-
-```{r}
-#| label: s5-full-imputation
+#| label: s4-full-imputation
 #| output: false
-#| code-summary: "Show code (S5: Run imputation on full sample)"
+#| code-summary: "Show code (S4: Run imputation on full sample)"
 
 M_FULL_SAMPLE <- 27
 
@@ -3642,7 +3930,6 @@ surveys_wide_full <- surveys |>
     edu_level,
     employment,
     marital_status,
-    life_sat_baseline,
     wemwbs,
     diaries_completed,
     self_reported_weekly_play,
@@ -3669,7 +3956,6 @@ surveys_wide_full <- surveys |>
       edu_level,
       employment,
       marital_status,
-      life_sat_baseline,
       wemwbs,
       diaries_completed,
       self_reported_weekly_play
@@ -3726,7 +4012,6 @@ person_level_vars <- c(
   "edu_level",
   "employment",
   "marital_status",
-  "life_sat_baseline",
   "wemwbs",
   "diaries_completed",
   "self_reported_weekly_play"
@@ -3815,7 +4100,6 @@ daily_imputed_full <- complete(imp_full, action = "long", include = TRUE) |>
       edu_level,
       employment,
       marital_status,
-      life_sat_baseline,
       wemwbs,
       diaries_completed,
       self_reported_weekly_play
@@ -3862,11 +4146,10 @@ message(glue(
 ```
 
 ```{r}
-#| label: s5-h2-models
+#| label: s4-full-h2-models
 #| output: false
-#| code-summary: "Show code (S5: Fit H2 models to full sample)"
+#| code-summary: "Show code (S4: Fit H2 models to full sample)"
 
-# File-based caching
 sens5_cache_file <- "data/models/sens5_fits.rds"
 sens5_pooled_file <- "data/models/sens5_pooled.rds"
 
@@ -3911,73 +4194,293 @@ if (file.exists(sens5_cache_file) && file.exists(sens5_pooled_file)) {
   # Save to cache
   saveRDS(sens5_fits, sens5_cache_file)
   saveRDS(sens5_pooled, sens5_pooled_file)
-  message("S5 models saved to cache")
+  message("S4 (full sample) models saved to cache")
 }
 ```
 
+Here we also repeat the H2 imputation-based analysis across a range of plausible survey-completion thresholds, to assess whether conclusions depend on the specific ≥15-wave cutoff used in the primary analysis.
+
 ```{r}
-#| label: tbl-s5-comparison
-#| tbl-cap: "S5: H2 model comparison between analytical sample (≥15 waves) and full sample (preregistered)"
-#| code-summary: "Show code (Create S5 comparison table)"
+#| label: s4-threshold-models
+#| output: false
+#| code-summary: "Show code (S4: Fit H2 models across completion thresholds)"
 
-# Analytical sample results
-analytical <- summary(h2_pooled) |>
-  as_tibble() |>
-  filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
-  mutate(
-    result = glue(
-      "{round(estimate, 3)} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
-    ),
-    sample = "Analytical (≥15 waves)"
-  ) |>
-  select(term, sample, result)
+# Post-process each threshold's imputation: composites, centering, telemetry join
+process_threshold <- function(imp_t, min_waves) {
+  telemetry_t <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(
+      pid,
+      wave,
+      telemetry_played_any_24h,
+      play_minutes_24h,
+      telemetry_played_any_12h,
+      play_minutes_12h,
+      telemetry_played_any_6h,
+      play_minutes_6h,
+      telemetry_played_any_24h_pre,
+      play_minutes_24h_pre
+    )
 
-# Full sample results
-full_sample <- summary(sens5_pooled) |>
-  as_tibble() |>
-  filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
-  mutate(
-    result = glue(
-      "{round(estimate, 3)} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
-    ),
-    sample = "Full sample"
-  ) |>
-  select(term, sample, result)
+  complete(imp_t, action = "long", include = TRUE) |>
+    pivot_longer(
+      cols = -c(
+        .imp,
+        .id,
+        pid,
+        age,
+        gender,
+        edu_level,
+        employment,
+        marital_status,
+        wemwbs,
+        diaries_completed,
+        self_reported_weekly_play
+      ),
+      names_to = c(".value", "wave"),
+      names_pattern = "(.+)_w(.+)"
+    ) |>
+    mutate(wave = as.factor(wave)) |>
+    mutate(
+      global_ns = rowMeans(pick(bpnsfs_1, bpnsfs_3, bpnsfs_5), na.rm = TRUE),
+      global_nf = rowMeans(pick(bpnsfs_2, bpnsfs_4, bpnsfs_6), na.rm = TRUE),
+      game_ns = rowMeans(pick(bangs_1, bangs_3, bangs_5), na.rm = TRUE),
+      game_nf = rowMeans(pick(bangs_2, bangs_4, bangs_6), na.rm = TRUE)
+    ) |>
+    left_join(telemetry_t, by = c("pid", "wave")) |>
+    group_by(.imp, pid) |>
+    mutate(
+      global_ns_pm = mean(global_ns, na.rm = TRUE),
+      global_nf_pm = mean(global_nf, na.rm = TRUE),
+      game_ns_pm = mean(game_ns, na.rm = TRUE)
+    ) |>
+    ungroup() |>
+    group_by(.imp) |>
+    mutate(
+      global_ns_gm = mean(global_ns_pm, na.rm = TRUE),
+      global_nf_gm = mean(global_nf_pm, na.rm = TRUE),
+      game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
+      global_ns_cw = global_ns - global_ns_pm,
+      global_nf_cw = global_nf - global_nf_pm,
+      game_ns_cw = game_ns - game_ns_pm,
+      global_ns_cb = global_ns_pm - global_ns_gm,
+      global_nf_cb = global_nf_pm - global_nf_gm,
+      game_ns_cb = game_ns_pm - game_ns_gm
+    ) |>
+    ungroup() |>
+    filter(.imp > 0)
+}
 
-# Combine
-bind_rows(analytical, full_sample) |>
-  mutate(
-    term = ifelse(term %in% names(labels), labels[term], term)
-  ) |>
-  pivot_wider(names_from = sample, values_from = result) |>
-  rename(Parameter = term) |>
-  tt() |>
-  style_tt(fontsize = 0.7) |>
-  style_tt(i = 0, bold = TRUE)
+# Fit the primary H2 model on each threshold's data and pool
+fit_h2_threshold <- function(dat_t, min_waves) {
+  cache_file <- glue("data/models/threshold_{min_waves}_h2_pooled.rds")
+
+  if (file.exists(cache_file)) {
+    message(glue("Loading threshold={min_waves} H2 pooled from cache"))
+    return(readRDS(cache_file))
+  }
+
+  m <- max(as.integer(dat_t$.imp))
+  fits <- lapply(1:m, function(i) {
+    glmmTMB(
+      telemetry_played_any_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = filter(dat_t, .imp == i),
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  pooled <- pool(fits)
+  saveRDS(pooled, cache_file)
+  pooled
+}
+
+threshold_results <- map2(
+  threshold_imps,
+  threshold_values,
+  function(imp_t, min_waves) {
+    dat_t <- process_threshold(imp_t, min_waves)
+    pooled_t <- fit_h2_threshold(dat_t, min_waves)
+
+    summary(pooled_t) |>
+      as_tibble() |>
+      filter(term %in% c("game_ns_cw", "global_nf_cw")) |>
+      mutate(
+        min_waves = min_waves,
+        lo = estimate - 1.96 * std.error,
+        hi = estimate + 1.96 * std.error,
+        coefficient = case_when(
+          term == "game_ns_cw" ~ "H2a: Game need satisfaction",
+          term == "global_nf_cw" ~ "H2b: Global need frustration"
+        )
+      )
+  }
+) |>
+  list_rbind()
 ```
 
-### S6: Interaction between game NS and global NF
+```{r}
+#| label: s4-combined-results
+#| code-summary: "Show code (S4: Combine sample-robustness results into one set of estimates)"
+
+# Pull the two focal H2 coefficients from a pooled model, in a common format
+extract_h2_terms <- function(pooled) {
+  summary(pooled) |>
+    as_tibble() |>
+    filter(term %in% c("game_ns_cw", "global_nf_cw")) |>
+    mutate(
+      coefficient = case_when(
+        term == "game_ns_cw" ~ "H2a: Game need satisfaction",
+        term == "global_nf_cw" ~ "H2b: Global need frustration"
+      ),
+      lo = estimate - 1.96 * std.error,
+      hi = estimate + 1.96 * std.error
+    ) |>
+    select(
+      term,
+      coefficient,
+      estimate,
+      std.error,
+      statistic,
+      df,
+      p.value,
+      lo,
+      hi
+    )
+}
+
+spec_levels <- c(
+  "Complete cases",
+  "10",
+  "12",
+  "15 (Primary)",
+  "18",
+  "20",
+  "24",
+  "Full sample (preregistered)"
+)
+
+sample_results <- bind_rows(
+  extract_h2_terms(sens4_pooled) |> mutate(spec = "Complete cases"),
+  threshold_results |>
+    filter(min_waves != 15) |>
+    mutate(spec = as.character(min_waves)) |>
+    select(
+      term,
+      coefficient,
+      estimate,
+      std.error,
+      statistic,
+      df,
+      p.value,
+      lo,
+      hi,
+      spec
+    ),
+  # The primary (≥15 waves) specification reuses the main H2 result (M=27)
+  # rather than the M=10 threshold-sweep refit, so it matches what is
+  # reported as the primary result everywhere else in the paper.
+  extract_h2_terms(h2_pooled) |> mutate(spec = "15 (Primary)"),
+  extract_h2_terms(sens5_pooled) |> mutate(spec = "Full sample (preregistered)")
+) |>
+  mutate(
+    spec = factor(spec, levels = spec_levels),
+    is_primary = spec == "15 (Primary)"
+  )
+```
+
+```{r}
+#| label: tbl-s4-results
+#| tbl-cap: "S4: H2 estimates across sample-construction and imputation specifications."
+#| code-summary: "Show code (S4: Build combined sample-robustness table)"
+
+sample_results |>
+  arrange(coefficient, spec) |>
+  transmute(
+    coefficient,
+    Specification = as.character(spec),
+    Estimate = number(estimate, 0.001),
+    SE = number(std.error, 0.001),
+    Statistic = number(statistic, 0.001),
+    df = number(df, 0.1),
+    p = ifelse(p.value < 0.001, "<.001", number(p.value, 0.001))
+  ) |>
+  select(-coefficient) |>
+  tt(
+    notes = "Statistic and df follow Rubin's rules (Barnard-Rubin approximation).",
+    width = .7
+  ) |>
+  group_tt(
+    i = list(
+      "H2a: Game need satisfaction" = 1,
+      "H2b: Global need frustration" = 9
+    )
+  ) |>
+  style_tt(fontsize = 0.7) |>
+  style_tt(i = c(0, 1, 10), bold = TRUE)
+```
+
+```{r}
+#| label: fig-s4-sample-robustness
+#| fig-cap: "S4: H2 estimates across sample-construction and imputation specifications. Points show pooled log-odds estimates; bars show 95% confidence intervals. The primary specification (threshold = 15 waves) is highlighted."
+#| code-summary: "Show code (S4: Plot sample-robustness estimates)"
+
+sample_results |>
+  ggplot(aes(
+    x = spec,
+    y = estimate,
+    ymin = lo,
+    ymax = hi,
+    colour = is_primary,
+    shape = is_primary
+  )) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_pointrange() +
+  scale_colour_manual(
+    values = c("FALSE" = "grey40", "TRUE" = "#E05C2A"),
+    guide = "none"
+  ) +
+  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 18), guide = "none") +
+  facet_wrap(~coefficient, ncol = 1, scales = "free_y") +
+  labs(
+    x = NULL,
+    y = "Estimate (log-odds)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+```
+
+### S5: Interaction between game NS and global NF
 
 Testing whether the association of global need frustration with play depends on recent game need satisfaction (i.e., do satisfied players respond differently to global need frustration?).
 
 ```{r}
-#| label: s6-interaction-model
+#| label: s5-interaction-model
 #| output: false
-#| code-summary: "Show code (S6: Fit models with game NS × global NF interaction)"
+#| code-summary: "Show code (S5: Fit models with game NS × global NF interaction)"
 
 # File-based caching to avoid re-running across multiple output formats
-sens6_cache_file <- "data/models/sens6_fits.rds"
-sens6_pooled_file <- "data/models/sens6_pooled.rds"
+sens5b_cache_file <- "data/models/sens5b_fits.rds"
+sens5b_pooled_file <- "data/models/sens5b_pooled.rds"
 
-if (file.exists(sens6_cache_file) && file.exists(sens6_pooled_file)) {
-  message("Loading cached S6 model fits")
-  sens6_fits <- readRDS(sens6_cache_file)
-  sens6_pooled <- readRDS(sens6_pooled_file)
+if (file.exists(sens5b_cache_file) && file.exists(sens5b_pooled_file)) {
+  message("Loading cached S5 model fits")
+  sens5b_fits <- readRDS(sens5b_cache_file)
+  sens5b_pooled <- readRDS(sens5b_pooled_file)
 } else {
-  message("Fitting S6 models...")
+  message("Fitting S5 models...")
 
-  sens6_fits <- lapply(1:m_imputations, function(i) {
-    message(glue("Fitting S6 model to imputation {i} of {m_imputations}"))
+  sens5b_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S5 model to imputation {i} of {m_imputations}"))
     dat_i <- dat |> filter(.imp == i)
     glmmTMB(
       telemetry_played_any_24h ~
@@ -3994,21 +4497,21 @@ if (file.exists(sens6_cache_file) && file.exists(sens6_pooled_file)) {
     )
   })
 
-  sens6_pooled <- pool(sens6_fits)
+  sens5b_pooled <- pool(sens5b_fits)
 
   # Save to cache
-  saveRDS(sens6_fits, sens6_cache_file)
-  saveRDS(sens6_pooled, sens6_pooled_file)
-  message("S6 models saved to cache")
+  saveRDS(sens5b_fits, sens5b_cache_file)
+  saveRDS(sens5b_pooled, sens5b_pooled_file)
+  message("S5 models saved to cache")
 }
 ```
 
 ```{r}
-#| label: tbl-s6-results
-#| tbl-cap: "S6: H2 with game NS \u00d7 global NF interaction"
-#| code-summary: "Show code (Create S3 results table)"
+#| label: tbl-s5-results
+#| tbl-cap: "S5: H2 with game NS \u00d7 global NF interaction"
+#| code-summary: "Show code (Create S5 results table)"
 
-summary(sens6_pooled) |>
+summary(sens5b_pooled) |>
   as_tibble() |>
   filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
   select(term, estimate, std.error, statistic, p.value) |>
@@ -4032,14 +4535,14 @@ summary(sens6_pooled) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
-### S7: Non-linearity test with splines
+### S6: Non-linearity test with splines
 
 Testing whether the relationships between predictors and play behavior are non-linear by fitting natural splines to the H2 predictors. We use complete cases only (no imputation) for computational simplicity.
 
 ```{r}
-#| label: s7-spline-model
+#| label: s6-spline-model
 #| output: false
-#| code-summary: "Show code (S7: Fit H2 model with natural splines)"
+#| code-summary: "Show code (S6: Fit H2 model with natural splines)"
 
 # Use complete cases only (no imputation)
 # Create this outside caching so it's available for plotting
@@ -4058,18 +4561,18 @@ dat_complete <- dat |>
   filter(complete.cases(pick(everything())))
 
 # File-based caching
-sens7_linear_file <- "data/models/sens7_linear.rds"
-sens7_spline_file <- "data/models/sens7_spline.rds"
+sens8_linear_file <- "data/models/sens8_linear.rds"
+sens8_spline_file <- "data/models/sens8_spline.rds"
 
-if (file.exists(sens7_linear_file) && file.exists(sens7_spline_file)) {
-  message("Loading cached S7 models")
-  sens7_linear <- readRDS(sens7_linear_file)
-  sens7_spline <- readRDS(sens7_spline_file)
+if (file.exists(sens8_linear_file) && file.exists(sens8_spline_file)) {
+  message("Loading cached S6 models")
+  sens8_linear <- readRDS(sens8_linear_file)
+  sens8_spline <- readRDS(sens8_spline_file)
 } else {
-  message("Fitting S7 models (linear vs spline)...")
+  message("Fitting S6 models (linear vs spline)...")
 
   # Linear model (for comparison)
-  sens7_linear <- glmmTMB(
+  sens8_linear <- glmmTMB(
     telemetry_played_any_24h ~
       game_ns_cw +
       game_ns_cb +
@@ -4082,7 +4585,7 @@ if (file.exists(sens7_linear_file) && file.exists(sens7_spline_file)) {
   )
 
   # Spline model with natural splines (3 df) on within-person predictors
-  sens7_spline <- glmmTMB(
+  sens8_spline <- glmmTMB(
     telemetry_played_any_24h ~
       ns(game_ns_cw, df = 3) +
       game_ns_cb +
@@ -4096,23 +4599,23 @@ if (file.exists(sens7_linear_file) && file.exists(sens7_spline_file)) {
 
   # Cache results
   dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
-  saveRDS(sens7_linear, sens7_linear_file)
-  saveRDS(sens7_spline, sens7_spline_file)
+  saveRDS(sens8_linear, sens8_linear_file)
+  saveRDS(sens8_spline, sens8_spline_file)
 }
 ```
 
 ```{r}
-#| label: tbl-s7-results
-#| tbl-cap: "S7: Model comparison between linear and spline specifications"
-#| code-summary: "Show code (Create S8 comparison table)"
+#| label: tbl-s6-results
+#| tbl-cap: "S6: Model comparison between linear and spline specifications"
+#| code-summary: "Show code (Create S6 comparison table)"
 
 # Compare model fit
 comparison <- tibble(
   Model = c("Linear", "Spline (3 df)"),
-  AIC = c(AIC(sens7_linear), AIC(sens7_spline)),
-  BIC = c(BIC(sens7_linear), BIC(sens7_spline)),
-  LogLik = c(logLik(sens7_linear), logLik(sens7_spline)),
-  N = c(nobs(sens7_linear), nobs(sens7_spline))
+  AIC = c(AIC(sens8_linear), AIC(sens8_spline)),
+  BIC = c(BIC(sens8_linear), BIC(sens8_spline)),
+  LogLik = c(logLik(sens8_linear), logLik(sens8_spline)),
+  N = c(nobs(sens8_linear), nobs(sens8_spline))
 ) |>
   mutate(
     `ΔAic` = AIC - min(AIC),
@@ -4126,9 +4629,9 @@ comparison |>
 ```
 
 ```{r}
-#| label: fig-s7-spline-predictions
-#| fig-cap: "S7: Comparison of linear vs spline predictions for H2 predictors. Points show observed data (aggregated), solid lines show linear model predictions, dashed lines show spline model predictions with 95% confidence ribbons."
-#| code-summary: "Show code (Plot S8 spline vs linear predictions)"
+#| label: fig-s6-spline-predictions
+#| fig-cap: "S6: Comparison of linear vs spline predictions for H2 predictors. Points show observed data (aggregated), solid lines show linear model predictions, dashed lines show spline model predictions with 95% confidence ribbons."
+#| code-summary: "Show code (Plot S6 spline vs linear predictions)"
 #| fig-height: 6
 
 # Generate predictions across the range of predictors
@@ -4147,7 +4650,7 @@ pred_data <- expand_grid(
 
 # Predictions for game NS (holding global NF at mean)
 pred_game_linear <- marginaleffects::predictions(
-  sens7_linear,
+  sens8_linear,
   newdata = datagrid(
     game_ns_cw = unique(pred_data$game_ns_cw),
     global_nf_cw = 0,
@@ -4161,7 +4664,7 @@ pred_game_linear <- marginaleffects::predictions(
   mutate(model = "Linear")
 
 pred_game_spline <- marginaleffects::predictions(
-  sens7_spline,
+  sens8_spline,
   newdata = datagrid(
     game_ns_cw = unique(pred_data$game_ns_cw),
     global_nf_cw = 0,
@@ -4192,7 +4695,7 @@ panel_a <- bind_rows(pred_game_linear, pred_game_spline) |>
 
 # Predictions for global NF (holding game NS at mean)
 pred_nf_linear <- marginaleffects::predictions(
-  sens7_linear,
+  sens8_linear,
   newdata = datagrid(
     game_ns_cw = 0,
     global_nf_cw = unique(pred_data$global_nf_cw),
@@ -4206,7 +4709,7 @@ pred_nf_linear <- marginaleffects::predictions(
   mutate(model = "Linear")
 
 pred_nf_spline <- marginaleffects::predictions(
-  sens7_spline,
+  sens8_spline,
   newdata = datagrid(
     game_ns_cw = 0,
     global_nf_cw = unique(pred_data$global_nf_cw),
@@ -4248,30 +4751,30 @@ panel_a +
 
 The spline model `r if(exists("comparison") && comparison$ΔAic[2] < -2) "shows substantially better fit (ΔAIC < -2)" else if(exists("comparison") && comparison$ΔAic[2] > 2) "does not outperform the linear model (ΔAIC > 2)" else "shows similar fit to the linear model"`, suggesting that the relationships between need satisfaction/frustration and play behavior `r if(exists("comparison") && comparison$ΔAic[2] < -2) "exhibit non-linear patterns" else "are adequately captured by linear terms"`.
 
-### S8: Separate needs components
+### S7: Separate needs components
 
 Testing whether associations with play differ across the three basic psychological needs (autonomy, competence, relatedness) rather than using composite need satisfaction scores. We test H2 separately for each need component.
 
 ```{r}
-#| label: s8-components-prep
+#| label: s7-components-prep
 #| code-summary: "Show code (Prepare data with separate needs components)"
 #| output: false
 
 # File-based caching to avoid re-running across multiple output formats
-sens8_cache_file <- "data/models/sens8_models.rds"
+sens9_cache_file <- "data/models/sens9_models.rds"
 
-if (file.exists(sens8_cache_file)) {
-  message("Loading cached S8 model fits")
-  sens8_cached <- readRDS(sens8_cache_file)
-  sens8_h2_aut <- sens8_cached$h2_aut
-  sens8_h2_com <- sens8_cached$h2_com
-  sens8_h2_rel <- sens8_cached$h2_rel
+if (file.exists(sens9_cache_file)) {
+  message("Loading cached S7 model fits")
+  sens9_cached <- readRDS(sens9_cache_file)
+  sens9_h2_aut <- sens9_cached$h2_aut
+  sens9_h2_com <- sens9_cached$h2_com
+  sens9_h2_rel <- sens9_cached$h2_rel
 } else {
-  message("Fitting S8 models...")
+  message("Fitting S7 models...")
 
   # Prepare component-level data for each imputation
-  sens8_data <- lapply(1:m_imputations, function(i) {
-    message(glue("Preparing S6 data for imputation {i} of {m_imputations}"))
+  sens9_data <- lapply(1:m_imputations, function(i) {
+    message(glue("Preparing S7 data for imputation {i} of {m_imputations}"))
     dat_i <- dat |> filter(.imp == i)
 
     # Calculate person means for each component (game and global)
@@ -4321,8 +4824,8 @@ if (file.exists(sens8_cache_file)) {
   })
 
   # H2 models: game component + matching global NF component → play
-  message("Fitting S8 H2 autonomy models...")
-  sens8_h2_aut <- pool(lapply(sens8_data, function(dat) {
+  message("Fitting S7 H2 autonomy models...")
+  sens9_h2_aut <- pool(lapply(sens9_data, function(dat) {
     glmmTMB(
       telemetry_played_any_24h ~ game_aut_cw +
         global_aut_nf_cw +
@@ -4334,8 +4837,8 @@ if (file.exists(sens8_cache_file)) {
     )
   }))
 
-  message("Fitting S8 H2 competence models...")
-  sens8_h2_com <- pool(lapply(sens8_data, function(dat) {
+  message("Fitting S7 H2 competence models...")
+  sens9_h2_com <- pool(lapply(sens9_data, function(dat) {
     glmmTMB(
       telemetry_played_any_24h ~ game_com_cw +
         global_com_nf_cw +
@@ -4347,8 +4850,8 @@ if (file.exists(sens8_cache_file)) {
     )
   }))
 
-  message("Fitting S8 H2 relatedness models...")
-  sens8_h2_rel <- pool(lapply(sens8_data, function(dat) {
+  message("Fitting S7 H2 relatedness models...")
+  sens9_h2_rel <- pool(lapply(sens9_data, function(dat) {
     glmmTMB(
       telemetry_played_any_24h ~ game_rel_cw +
         global_rel_nf_cw +
@@ -4363,47 +4866,47 @@ if (file.exists(sens8_cache_file)) {
   # Save to cache
   saveRDS(
     list(
-      h2_aut = sens8_h2_aut,
-      h2_com = sens8_h2_com,
-      h2_rel = sens8_h2_rel
+      h2_aut = sens9_h2_aut,
+      h2_com = sens9_h2_com,
+      h2_rel = sens9_h2_rel
     ),
-    sens8_cache_file
+    sens9_cache_file
   )
-  message("S8 models saved to cache")
+  message("S7 models saved to cache")
 }
 ```
 
 ```{r}
-#| label: tbl-s8-h2-results
-#| tbl-cap: "S8: Associations between need components and probability of subsequent play"
-#| code-summary: "Show code (Create S8 results table)"
+#| label: tbl-s7-h2-results
+#| tbl-cap: "S7: Associations between need components and probability of subsequent play"
+#| code-summary: "Show code (Create S7 results table)"
 
-# Extract within-person effects for both game and global needs from each model
+# H2a rows first (game NS components), then H2b rows (global NF components)
 bind_rows(
-  summary(sens8_h2_aut) |>
+  summary(sens9_h2_aut) |>
     as_tibble() |>
     filter(term == "game_aut_cw") |>
-    mutate(predictor = "Game autonomy"),
-  summary(sens8_h2_aut) |>
-    as_tibble() |>
-    filter(term == "global_aut_nf_cw") |>
-    mutate(predictor = "Global autonomy frustration"),
-  summary(sens8_h2_com) |>
+    mutate(predictor = "Autonomy satisfaction"),
+  summary(sens9_h2_com) |>
     as_tibble() |>
     filter(term == "game_com_cw") |>
-    mutate(predictor = "Game competence"),
-  summary(sens8_h2_com) |>
-    as_tibble() |>
-    filter(term == "global_com_nf_cw") |>
-    mutate(predictor = "Global competence frustration"),
-  summary(sens8_h2_rel) |>
+    mutate(predictor = "Competence satisfaction"),
+  summary(sens9_h2_rel) |>
     as_tibble() |>
     filter(term == "game_rel_cw") |>
-    mutate(predictor = "Game relatedness"),
-  summary(sens8_h2_rel) |>
+    mutate(predictor = "Relatedness satisfcation"),
+  summary(sens9_h2_aut) |>
+    as_tibble() |>
+    filter(term == "global_aut_nf_cw") |>
+    mutate(predictor = "Autonomy frustration"),
+  summary(sens9_h2_com) |>
+    as_tibble() |>
+    filter(term == "global_com_nf_cw") |>
+    mutate(predictor = "Competence frustration"),
+  summary(sens9_h2_rel) |>
     as_tibble() |>
     filter(term == "global_rel_nf_cw") |>
-    mutate(predictor = "Global relatedness frustration")
+    mutate(predictor = "Relatedness frustration")
 ) |>
   mutate(
     across(c(estimate, std.error, statistic), ~ round(.x, 3)),
@@ -4420,33 +4923,41 @@ bind_rows(
     p = p.value
   ) |>
   tt(
-    notes = "All predictors are day-to-day fluctuations (i.e., within-person centered predictors). Outcome: Probability of playing in subsequent 24 hours."
+    width = 0.5,
+    notes = "All predictors are day-to-day fluctuations (within-person centered). Outcome: Probability of playing in subsequent 24 hours. Each need component is from a separate model."
   ) |>
+  group_tt(
+    i = list(
+      "H2a: In-game need satisfaction → subsequent play" = 1,
+      "H2b: Global need frustration → subsequent play" = 4
+    )
+  ) |>
+  style_tt(i = c(1, 5), bold = TRUE) |>
   style_tt(fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
-### S9: Game need frustration and play behavior
+### S8: Game need frustration and play behavior
 
 Testing whether game need frustration (rather than satisfaction) is related to subsequent play behavior. This mirrors the H2a hypothesis but uses frustration instead of satisfaction.
 
 ```{r}
-#| label: s9-game-nf-model
+#| label: s8-game-nf-model
 #| output: false
-#| code-summary: "Show code (S9: Fit model with game NF predicting play)"
+#| code-summary: "Show code (S8: Fit model with game NF predicting play)"
 
 # File-based caching
-sens9_cache_file <- "data/models/sens9_fits.rds"
-sens9_pooled_file <- "data/models/sens9_pooled.rds"
+sens10_cache_file <- "data/models/sens10_fits.rds"
+sens10_pooled_file <- "data/models/sens10_pooled.rds"
 
-if (file.exists(sens9_pooled_file)) {
-  message("Loading cached S9 pooled results")
-  sens9_pooled <- readRDS(sens9_pooled_file)
+if (file.exists(sens10_pooled_file)) {
+  message("Loading cached S8 pooled results")
+  sens10_pooled <- readRDS(sens10_pooled_file)
 } else {
-  message("Fitting S9 models...")
+  message("Fitting S8 models...")
 
   # Prepare data with game_nf centered
-  sens9_data <- lapply(1:m_imputations, function(i) {
+  sens10_data <- lapply(1:m_imputations, function(i) {
     dat_i <- dat |> filter(.imp == i)
 
     dat_i |>
@@ -4463,7 +4974,7 @@ if (file.exists(sens9_pooled_file)) {
   })
 
   # Fit models
-  sens9_fits <- lapply(sens9_data, function(dat_i) {
+  sens10_fits <- lapply(sens10_data, function(dat_i) {
     glmmTMB::glmmTMB(
       telemetry_played_any_24h ~
         game_nf_cw +
@@ -4479,21 +4990,21 @@ if (file.exists(sens9_pooled_file)) {
   })
 
   # Pool results
-  sens9_pooled <- pool(sens9_fits)
+  sens10_pooled <- pool(sens10_fits)
 
   # Save to cache
-  saveRDS(sens9_fits, sens9_cache_file)
-  saveRDS(sens9_pooled, sens9_pooled_file)
-  message("S9 models saved to cache")
+  saveRDS(sens10_fits, sens10_cache_file)
+  saveRDS(sens10_pooled, sens10_pooled_file)
+  message("S8 models saved to cache")
 }
 ```
 
 ```{r}
-#| label: tbl-s9-results
-#| tbl-cap: "S9: Game need frustration predicting subsequent play"
-#| code-summary: "Show code (Create S10 results table)"
+#| label: tbl-s8-results
+#| tbl-cap: "S8: Game need frustration predicting subsequent play"
+#| code-summary: "Show code (Create S8 results table)"
 
-summary(sens9_pooled) |>
+summary(sens10_pooled) |>
   as_tibble() |>
   filter(term != "(Intercept)", !str_detect(term, "_cb")) |>
   select(term, estimate, std.error, statistic, p.value) |>
@@ -4519,13 +5030,13 @@ summary(sens9_pooled) |>
 
 Results show that when people experience higher than usual in-game need frustration, they are less likely to play on the following day, but that this relationship is small. Nonetheless, in contrast to the robust null results for game need satisfaction across various specifications, this provides some initial evidence that need frustration may be more salient for day-to-day change in gaming behavior than need satisfaction.
 
-### S10: H3 displacement by specific core life domain
+### S9: H3 displacement by specific core life domain
 
-The main H3 analysis aggregated all core life domains (work/school, social engagements, sleep/eating/fitness, caretaking) into a single binary indicator. Here we test whether specific domains show differential relationships with global need satisfaction.
+The main H3 analysis aggregated all core life domains (work/school, social engagements, sleep/eating/fitness, caretaking) into a single binary indicator. Here we test whether specific displaced domains differ in their relationship with global need satisfaction.
 
 ```{r}
-#| label: s10-h3-by-domain-prep
-#| code-summary: "Show code (S10: Prepare domain-specific displacement indicators)"
+#| label: s9-h3-by-domain-prep
+#| code-summary: "Show code (S9: Prepare domain-specific displacement indicators)"
 
 # Create domain-specific displacement indicators
 dat_domains <- dat |>
@@ -4542,20 +5053,20 @@ dat_domains <- dat |>
 ```
 
 ```{r}
-#| label: s10-h3-by-domain-models
+#| label: s9-h3-by-domain-models
 #| output: false
-#| code-summary: "Show code (S10: Fit H3 models for each core life domain)"
+#| code-summary: "Show code (S9: Fit H3 models for each core life domain)"
 
 # File-based caching
-s10_cache_file <- "data/models/s10_fits.rds"
-s10_pooled_file <- "data/models/s10_pooled.rds"
+s10_cache_file <- "data/models/s11_fits.rds"
+s10_pooled_file <- "data/models/s11_pooled.rds"
 
 if (file.exists(s10_cache_file) && file.exists(s10_pooled_file)) {
-  message("Loading cached S10 model fits")
+  message("Loading cached S9 model fits")
   s10_fits <- readRDS(s10_cache_file)
   s10_pooled <- readRDS(s10_pooled_file)
 } else {
-  message("Fitting S10 models...")
+  message("Fitting S9 models...")
 
   # Fit separate model for each domain
   domains <- c(
@@ -4593,14 +5104,14 @@ if (file.exists(s10_cache_file) && file.exists(s10_pooled_file)) {
   dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
   saveRDS(s10_fits, s10_cache_file)
   saveRDS(s10_pooled, s10_pooled_file)
-  message("S10 models saved to cache")
+  message("S9 models saved to cache")
 }
 ```
 
 ```{r}
-#| label: tbl-s10-domain-results
+#| label: tbl-s9-domain-results
 #| tbl-cap: "H3 sensitivity analysis: Effect of displacing specific core life domains on global need satisfaction"
-#| code-summary: "Show code (Create S10 results table)"
+#| code-summary: "Show code (Create S9 results table)"
 
 # Extract results for each domain
 s10_results <- bind_rows(
@@ -4632,6 +5143,7 @@ s10_results |>
     )
   ) |>
   tt(
+    width = 0.5,
     escape = TRUE,
     notes = "All models include random intercepts, random slopes, and AR(1) autocorrelation. Estimates represent the difference in global need satisfaction when the specific domain was displaced vs. not displaced."
   ) |>
@@ -4639,5 +5151,5 @@ s10_results |>
   style_tt(i = 0, bold = TRUE)
 ```
 
-Results showed that global need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
+Results showed that global need satisfaction was lower when gaming displaced sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
 

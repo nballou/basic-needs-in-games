@@ -41,11 +41,19 @@ report_lmer_term <- function(
   if (p_method == "wald_z") {
     z <- est / se
     p <- 2 * stats::pnorm(abs(z), lower.tail = FALSE)
-    p_str <- paste0(", ", label_p, " = ", round(p, digits_p))
+    p_str <- paste0(
+      ", z = ",
+      round(z, digits_est),
+      ", ",
+      label_p,
+      " = ",
+      round(p, digits_p)
+    )
   }
 
   glue::glue(
-    "{round(est, digits_est)}, {round(level*100)}% CI [{round(ci[1], digits_ci)}, {round(ci[2], digits_ci)}]{p_str}"
+    "{round(est, digits_est)}, SE = {round(se, digits_est)}, ",
+    "{round(level*100)}% CI [{round(ci[1], digits_ci)}, {round(ci[2], digits_ci)}]{p_str}"
   )
 }
 
@@ -119,7 +127,8 @@ report_wb_estimate <- function(
   pooled_summary,
   term_cw,
   term_cb = NULL,
-  accuracy = 0.01
+  accuracy = 0.01,
+  stat_label = "t"
 ) {
   # Helper to format p-values consistently
 
@@ -141,7 +150,9 @@ report_wb_estimate <- function(
       ci_low = estimate - 1.96 * std.error,
       ci_high = estimate + 1.96 * std.error,
       result = glue(
-        "{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], p = {day_p}"
+        "{number(estimate, accuracy)}, SE = {number(std.error, accuracy)}, ",
+        "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
+        "{stat_label} = {number(statistic, accuracy)}, p = {day_p}"
       )
     ) |>
     pull(result)
@@ -161,7 +172,9 @@ report_wb_estimate <- function(
         ci_low = estimate - 1.96 * std.error,
         ci_high = estimate + 1.96 * std.error,
         result = glue(
-          "{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], p = {agg_p}"
+          "{number(estimate, accuracy)}, SE = {number(std.error, accuracy)}, ",
+          "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
+          "{stat_label} = {number(statistic, accuracy)}, p = {agg_p}"
         )
       ) |>
       pull(result)

@@ -8,6 +8,7 @@
 ^~$*
 /.quarto/
 /_site/
+pci/
 
 # Ignore large downloadable datasets
 /data/open-play*/
