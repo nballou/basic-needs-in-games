@@ -1,0 +1,31 @@
+---
+title: "All BANG, little buck"
+subtitle: "Basic psychological needs are weakly linked with video gaming behavior"
+---
+
+This site hosts the analysis output for the Stage 2 Registered Report.
+
+## Documents
+
+- [**Manuscript**](manuscript.html) --- introduction, methods, confirmatory
+  results (Study A), Study B, and discussion
+- [**Supplement**](supplement.html) --- design table, full model outputs,
+  imputation diagnostics, and the S1--S9 sensitivity analyses
+
+## Pipeline stages
+
+The analysis runs as a [`targets`](https://docs.ropensci.org/targets/)
+pipeline. Each stage is a rendered document:
+
+- [Preprocessing](preprocessing.html) --- data loading, telemetry
+  aggregation, survey enrichment
+- [Multiple imputation](imputation.html) --- MICE and within/between-person
+  centering
+- [Modelling](modelling.html) --- H1--H3 hypothesis tests and diagnostics
+- [Study B](studyb.html) --- PowerWash Simulator session models
+
+## Links
+
+- Stage 1 Registered Report: <https://osf.io/pb5nu>
+- Data (Zenodo): {{< meta data-url >}}
+- Source code: {{< meta repo-url >}}
