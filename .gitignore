@@ -82,3 +82,4 @@ rsconnect/
 **/*.quarto_ipynb
 FORMATTING_GUIDE.md
 WORKFLOW.md
+PLAN-manuscript-split.md
