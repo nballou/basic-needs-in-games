@@ -1,0 +1,296 @@
+---
+title: "Study B: PowerWash Simulator"
+subtitle: "Session data preparation and behavioural models for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+This document prepares the *PowerWash Simulator* (PWS) session data and fits
+the two exploratory behavioural models reported in the manuscript's Study B.
+It is its own `targets` stage (`studyb_report`), independent of the Study A
+pipeline (`preprocessing.qmd` -> `imputation.qmd` -> `modelling.qmd`) -- it
+shares no data with them. `manuscript.qmd` reads this document's exported
+objects via `targets::tar_load()` and renders the Study B figure and prose.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(lme4)
+library(janitor)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/export.R")
+```
+
+## Data Sources
+
+PWS data are downloaded from OSF on first run and cached locally (the archive
+is large, ~800 MB). Only `study_prompt_answered.csv` is extracted.
+
+```{r}
+#| label: data-download
+#| code-summary: "Show code (Download PWS data from OSF)"
+
+path_pws <- "data/pws/pws_data.zip"
+if (!file.exists(path_pws)) {
+  dir.create("data/pws", showWarnings = FALSE, recursive = TRUE)
+  options(timeout = max(600, getOption("timeout")))
+  download.file(
+    url = "https://osf.io/download/j48qf/",
+    destfile = path_pws
+  )
+}
+
+# Extract only the study_prompt_answered.csv file we need
+if (!file.exists("data/pws/study_prompt_answered.csv")) {
+  unzip(
+    zipfile = path_pws,
+    files = "data/study_prompt_answered.csv",
+    exdir = "data/pws",
+    junkpaths = TRUE
+  )
+}
+```
+
+## Session Preparation
+
+In-game experience prompts are grouped into play sessions (continuous
+activity separated by gaps of at least 30 minutes), each session's autonomy
+and competence ratings averaged into a single game need-satisfaction
+indicator, and session length / session gap derived from the timestamps.
+Need satisfaction is then decomposed into within- and between-person
+components. The processed session table is cached to
+`data/pws/pws_sessions.csv`.
+
+```{r}
+#| label: session-prep
+#| code-summary: "Show code (Prepare PWS session data)"
+
+if (!file.exists("data/pws/pws_sessions.csv")) {
+  # Load and process prompts
+  pws_raw <- read_csv(
+    "data/pws/study_prompt_answered.csv",
+    col_select = c(
+      pid,
+      time = Time_utc,
+      duration = CurrentSessionLength,
+      prompt = LastStudyPromptType,
+      response
+    ),
+    show_col_types = FALSE
+  ) |>
+    mutate(
+      pid = factor(pid),
+      # The raw VAS responses are stored on a 0-1000 internal scale (not the
+      # documented 0-100 -- confirmed via schema.sql and the observed range/
+      # granularity of `response`, consistent across all six prompt types),
+      # so we divide by 1000 to recover a 0-1 fraction, then rescale that to
+      # a 1-7 scale matching Study A's BANGS items.
+      response = 1 + (response / 1000) * 6
+    ) |>
+    arrange(pid, time) |>
+    mutate(
+      # Calculate time since last prompt in minutes
+      time_since_last = as.numeric(
+        difftime(
+          time,
+          lag(time, 1, default = as_datetime("1970-01-01")),
+          units = "mins"
+        )
+      ),
+      # New session if gap > 30 minutes
+      new_session = time_since_last > 30,
+      session = cumsum(new_session),
+      .by = pid
+    ) |>
+    select(-time_since_last)
+
+  # Save prompt-level data for troubleshooting (includes all prompt times)
+  pws_prompts_detail <- pws_raw |>
+    select(-new_session) |>
+    group_by(pid, session) |>
+    filter(n() > 1) |>
+    mutate(
+      prompt_time = time,
+      first_time = first(time),
+      first_duration = first(duration),
+      startTime = if_else(
+        first_duration < 15,
+        first_time - first_duration * 60,
+        first_time
+      ),
+      startTime = min(startTime),
+      endTime = max(time),
+      sessionLength = round(as.integer(endTime - startTime) / 60, 2)
+    ) |>
+    ungroup() |>
+    select(
+      pid,
+      session,
+      prompt_time,
+      prompt,
+      response,
+      duration,
+      startTime,
+      endTime,
+      sessionLength
+    )
+
+  # Summarize for analysis
+  pws_prompts <- pws_raw |>
+    select(-new_session) |>
+    group_by(pid, session) |>
+    filter(n() > 1) |>
+    mutate(
+      first_time = first(time),
+      first_duration = first(duration),
+      startTime = if_else(
+        first_duration < 15,
+        first_time - first_duration * 60,
+        first_time
+      ),
+      startTime = min(startTime),
+      endTime = max(time)
+    ) |>
+    select(-first_time, -first_duration) |>
+    group_by(pid, session, prompt) |>
+    summarise(
+      numPrompts = n(),
+      mean = mean(response, na.rm = TRUE),
+      startTime = first(startTime),
+      endTime = first(endTime),
+      .groups = "drop"
+    ) |>
+    mutate(
+      sessionLength = round(as.integer(endTime - startTime) / 60, 2),
+      mean = ifelse(is.nan(mean), NA_real_, mean)
+    )
+
+  # Convert to wide format
+  pws_wide <- pws_prompts |>
+    filter(sessionLength > 5 & sessionLength < 480) |>
+    pivot_wider(
+      id_cols = c(pid, session, startTime, endTime, sessionLength),
+      names_from = prompt,
+      values_from = c(numPrompts, mean),
+      names_sort = TRUE
+    ) |>
+    select(-contains("_NA")) |>
+    janitor::clean_names() |>
+    group_by(pid) |>
+    mutate(
+      session_gap = lead(start_time, 1) - end_time,
+      session_gap = round(as.integer(session_gap) / 60 / 60, 2),
+      prev_session_length = lag(session_length, 1),
+      prev_session_gap = lag(session_gap, 1),
+      # Combine autonomy and competence into game need satisfaction
+      game_ns = (mean_autonomy + mean_competence) / 2,
+      # Calculate person means
+      game_ns_pm = mean(game_ns, na.rm = TRUE),
+      session_length_pm = mean(session_length, na.rm = TRUE),
+      session_gap_pm = mean(session_gap, na.rm = TRUE)
+    ) |>
+    ungroup() |>
+    # Calculate grand means and centered values
+    mutate(
+      game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
+      session_length_gm = mean(session_length_pm, na.rm = TRUE),
+      session_gap_gm = mean(session_gap_pm, na.rm = TRUE),
+      # Within-person centered (deviation from person mean)
+      game_ns_cw = game_ns - game_ns_pm,
+      session_length_cw = session_length - session_length_pm,
+      session_gap_cw = session_gap - session_gap_pm,
+      # Between-person centered (person mean - grand mean)
+      game_ns_cb = game_ns_pm - game_ns_gm,
+      session_length_cb = session_length_pm - session_length_gm,
+      session_gap_cb = session_gap_pm - session_gap_gm
+    ) |>
+    select(
+      pid,
+      session,
+      session_length,
+      session_gap,
+      prev_session_length,
+      prev_session_gap,
+      everything()
+    )
+
+  write_csv(pws_wide, "data/pws/pws_sessions.csv")
+  write_csv(pws_prompts_detail, "data/pws/pws_prompts_detail.csv")
+} else {
+  pws_wide <- read_csv("data/pws/pws_sessions.csv", show_col_types = FALSE)
+  pws_prompts_detail <- read_csv(
+    "data/pws/pws_prompts_detail.csv",
+    show_col_types = FALSE
+  )
+}
+
+pws_n_players <- length(unique(pws_wide$pid))
+pws_n_sessions <- nrow(pws_wide)
+
+message(glue(
+  "PWS sessions: {pws_n_sessions} sessions across {pws_n_players} players"
+))
+```
+
+## Behavioural Models
+
+Two linear mixed models (log outcomes, random intercepts and slopes for
+within-person need satisfaction), each controlling for the previous session's
+value of the outcome. Pooling/prediction and inline reporting happen in
+`manuscript.qmd`.
+
+```{r}
+#| label: models
+#| code-summary: "Show code (Fit PWS session-length and session-gap models)"
+
+# Model 1: Session length ~ game need satisfaction
+pws_m1 <- lme4::lmer(
+  log(session_length) ~
+    game_ns_cw +
+    game_ns_cb +
+    prev_session_length +
+    (1 + game_ns_cw | pid),
+  data = pws_wide
+)
+
+# Model 2: Session gap ~ game need satisfaction
+pws_m2 <- lme4::lmer(
+  log(session_gap) ~
+    game_ns_cw +
+    game_ns_cb +
+    prev_session_gap +
+    (1 + game_ns_cw | pid),
+  data = pws_wide |> filter(!is.na(session_gap))
+)
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for manuscript.qmd/supplement.qmd)"
+
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  studyb_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(studyb_export_names)} objects to data/exports/"))
+```

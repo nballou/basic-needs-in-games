@@ -27,8 +27,20 @@ imputation_export_names <- c(
   "imp_diag"
 )
 
-# modelling.qmd: H1/H2/H3 (+ later PWS, S1-S9) model fitting (tar_load()s
-# from imputation.qmd)
+# studyb.qmd: PowerWash Simulator session prep + the two exploratory
+# behavioural models. Independent of the Study A pipeline. pws_wide is
+# exported so manuscript.qmd can build prediction grids for the Study B
+# figure; pws_m1/pws_m2 also feed supplement.qmd's full-model-output table.
+studyb_export_names <- c(
+  "pws_m1",
+  "pws_m2",
+  "pws_wide",
+  "pws_n_players",
+  "pws_n_sessions"
+)
+
+# modelling.qmd: H1/H2/H3 (+ later S1-S9) model fitting (tar_load()s from
+# imputation.qmd)
 modelling_export_names <- c(
   "h1_pooled",
   "h1mod",

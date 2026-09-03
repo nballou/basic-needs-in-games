@@ -46,11 +46,20 @@ list(
   ),
   export_targets(imputation_export_names, "imputation_report"),
 
-  # H1/H2/H3 (+ later PWS, S1-S9) model fitting
+  # H1/H2/H3 (+ later S1-S9) model fitting
   tar_quarto(
     modelling_report,
     path = "modelling.qmd",
     extra_files = c("R/targets/models_main.R", "R/targets/export.R")
   ),
-  export_targets(modelling_export_names, "modelling_report")
+  export_targets(modelling_export_names, "modelling_report"),
+
+  # Study B (PowerWash Simulator): session prep + two behavioural models.
+  # Independent branch -- shares no data with the Study A stages above.
+  tar_quarto(
+    studyb_report,
+    path = "studyb.qmd",
+    extra_files = "R/targets/export.R"
+  ),
+  export_targets(studyb_export_names, "studyb_report")
 )
