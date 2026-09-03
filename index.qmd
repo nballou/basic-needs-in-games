@@ -1,31 +1,40 @@
 ---
 title: "All BANG, little buck"
 subtitle: "Basic psychological needs are weakly linked with video gaming behavior"
+number-sections: false
+toc: false
 ---
 
-This site hosts the analysis output for the Stage 2 Registered Report.
+Stage 2 Registered Report. This site hosts the full analysis output.
 
-## Documents
+> Psychological theories of media use often assume that subjective motivation
+> affects observable behavior. Using video games as a test case, we pair
+> repeated self-reports of motivation with objective digital trace data at
+> scale. Across two datasets, need satisfaction was robustly associated with
+> subjective states but showed weak or null associations with short-term
+> gaming behavior --- a substantial motivation--behavior gap.
 
-- [**Manuscript**](manuscript.html) --- introduction, methods, confirmatory
-  results (Study A), Study B, and discussion
-- [**Supplement**](supplement.html) --- design table, full model outputs,
-  imputation diagnostics, and the S1--S9 sensitivity analyses
+## Read the paper
 
-## Pipeline stages
+| | |
+|---|---|
+| [**Manuscript**](manuscript.qmd) | Introduction, methods, confirmatory results (Study A), Study B, discussion |
+| [**Supplement**](supplement.qmd) | Design table, full model outputs, imputation diagnostics, S1--S9 sensitivity analyses |
+
+## Analysis pipeline
 
 The analysis runs as a [`targets`](https://docs.ropensci.org/targets/)
-pipeline. Each stage is a rendered document:
+pipeline; each stage is a rendered document.
 
-- [Preprocessing](preprocessing.html) --- data loading, telemetry
-  aggregation, survey enrichment
-- [Multiple imputation](imputation.html) --- MICE and within/between-person
-  centering
-- [Modelling](modelling.html) --- H1--H3 hypothesis tests and diagnostics
-- [Study B](studyb.html) --- PowerWash Simulator session models
+| | |
+|---|---|
+| [Preprocessing](preprocessing.qmd) | Zenodo download, telemetry aggregation, survey enrichment |
+| [Multiple imputation](imputation.qmd) | MICE and within/between-person centering |
+| [Modelling](modelling.qmd) | H1--H3 hypothesis tests and diagnostics |
+| [Study B](studyb.qmd) | PowerWash Simulator session models |
 
 ## Links
 
 - Stage 1 Registered Report: <https://osf.io/pb5nu>
 - Data (Zenodo): {{< meta data-url >}}
-- Source code: {{< meta repo-url >}}
+- Source: {{< meta repo-url >}}

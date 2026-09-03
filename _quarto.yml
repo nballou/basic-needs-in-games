@@ -16,6 +16,63 @@ project:
 execute:
   freeze: auto
 
+website:
+  title: "All BANG, little buck"
+  navbar:
+    background: primary
+    left:
+      - text: "Manuscript"
+        href: manuscript.qmd
+      - text: "Supplement"
+        href: supplement.qmd
+      - text: "Pipeline"
+        menu:
+          - text: "Preprocessing"
+            href: preprocessing.qmd
+          - text: "Multiple imputation"
+            href: imputation.qmd
+          - text: "Modelling"
+            href: modelling.qmd
+          - text: "Study B (PowerWash)"
+            href: studyb.qmd
+    right:
+      - icon: github
+        href: https://github.com/nballou/basic-needs-in-games
+        aria-label: GitHub
+  repo-url: https://github.com/nballou/basic-needs-in-games
+  repo-actions: [source, issue]
+  page-navigation: true
+
+# Site-wide HTML look. Individual documents (e.g. manuscript.qmd's author
+# block, supplement.qmd's bibliography) override or extend these keys locally;
+# everything not set at the document level is inherited from here.
+format:
+  html:
+    theme:
+      light: united
+      dark: darkly
+    toc: true
+    toc-depth: 2
+    toc-location: right
+    number-sections: true
+    fontsize: 13pt
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    code-links: repo
+    embed-resources: false
+    page-layout: article
+    grid:
+      body-width: 900px
+      margin-width: 250px
+    other-links:
+      - text: Stage 1 Registered Report
+        href: https://osf.io/pb5nu
+        icon: file-pdf
+      - text: Data (Zenodo)
+        href: https://doi.org/10.5281/zenodo.18352505
+        icon: link
+
 repo-url: https://github.com/nballou/basic-needs-in-games
 site-url: https://nballou.github.io/basic-needs-in-games/
 data-url: https://doi.org/10.5281/zenodo.18352505
