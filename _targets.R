@@ -72,5 +72,14 @@ list(
     supplement_report,
     path = "supplement.qmd",
     extra_files = "R/helpers.R"
+  ),
+
+  # Manuscript body: introduction, Study A method + results, Study B, and
+  # discussion. Fits nothing -- every computed object is tar_load()ed from
+  # the pipeline stages above. No exported objects.
+  tar_quarto(
+    manuscript_report,
+    path = "manuscript.qmd",
+    extra_files = c("R/helpers.R", "R/targets/imputation.R")
   )
 )

@@ -9,6 +9,7 @@ project:
     - modelling.qmd
     - studyb.qmd
     - supplement.qmd
+    - manuscript.qmd
   preview:
     watch-inputs: true
 
