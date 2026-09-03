@@ -29,6 +29,7 @@ library(glue)
 library(glmmTMB)
 library(mice)
 library(broom.mixed)
+library(DHARMa)
 library(future)
 library(furrr)
 library(targets)
@@ -105,6 +106,144 @@ h3_fits <- fit_mi_models(
 )
 h3_pooled <- pool(h3_fits)
 h3mod <- h3_fits[[1]]
+```
+
+## Model Diagnostics
+
+Convergence across imputations, random-effect structure, and (for the binary
+H2 outcome) DHARMa residual checks. These operate on the per-imputation fit
+lists (`h1_fits` / `h2_fits`), which are not exported -- so they live here in
+the modelling stage rather than in the manuscript. None of these quantities
+are cited in the manuscript text.
+
+```{r}
+#| label: h1-diagnostics
+#| code-summary: "Show code (H1 convergence and random-effect structure)"
+
+# Convergence check across imputations
+conv_summary <- tibble(
+  imputation = seq_along(h1_fits),
+  converged = map_lgl(h1_fits, ~ .x$fit$convergence == 0),
+  warnings = map_chr(
+    h1_fits,
+    ~ {
+      w <- .x$fit$warnings
+      if (length(w) > 0) paste(w, collapse = "; ") else "None"
+    }
+  )
+)
+print(conv_summary)
+glue("Converged: {sum(conv_summary$converged)}/{nrow(conv_summary)}")
+
+# Random effect structure (from the first imputation's model)
+re_sd <- attr(VarCorr(h1mod)$cond$pid, "stddev")
+glue("Random intercept SD: {round(re_sd[1], 3)}")
+if (length(re_sd) > 1) {
+  glue("Random slope SD (game_ns_cw): {round(re_sd[2], 3)}")
+}
+```
+
+```{r}
+#| label: h2-diagnostics
+#| code-summary: "Show code (H2 convergence, random effects, DHARMa residuals)"
+#| fig-width: 8
+
+# Convergence check across imputations
+conv_summary <- tibble(
+  imputation = seq_along(h2_fits),
+  converged = map_lgl(h2_fits, ~ .x$fit$convergence == 0),
+  warnings = map_chr(
+    h2_fits,
+    ~ {
+      w <- .x$fit$warnings
+      if (length(w) > 0) paste(w, collapse = "; ") else "None"
+    }
+  )
+)
+print(conv_summary)
+glue("Converged: {sum(conv_summary$converged)}/{nrow(conv_summary)}")
+
+# Random effect structure (first imputation's model)
+re_sd <- attr(VarCorr(h2mod)$cond$pid, "stddev")
+re_names <- names(re_sd)
+walk2(re_names, re_sd, ~ glue("{.x} SD: {round(.y, 3)}"))
+
+# Random intercept distribution (logit scale)
+re_intercepts <- coef(h2mod)$cond$pid[, "(Intercept)"]
+tibble(
+  stat = c("Mean", "SD", "Min", "Max", "IQR_25%", "IQR_75%"),
+  value = c(
+    mean(re_intercepts),
+    sd(re_intercepts),
+    min(re_intercepts),
+    max(re_intercepts),
+    quantile(re_intercepts, 0.25),
+    quantile(re_intercepts, 0.75)
+  )
+) |>
+  mutate(value = round(value, 3)) |>
+  print()
+
+# Implied probability at fixed intercept
+fixed_int <- fixef(h2mod)$cond["(Intercept)"]
+glue("Pr(play) at population mean: {round(plogis(fixed_int), 3)}")
+
+# DHARMa residual diagnostics
+sim_resid <- simulateResiduals(h2mod, plot = FALSE)
+plot(sim_resid, main = "H2 Model: DHARMa diagnostics")
+
+list(
+  dispersion = testDispersion(sim_resid),
+  outliers = testOutliers(sim_resid),
+  quantiles = testQuantiles(sim_resid)
+) |>
+  walk(print)
+
+# Residuals vs. predictors
+par(mfrow = c(2, 2))
+walk2(
+  c("game_ns_cw", "global_nf_cw", "game_ns_cb", "global_nf_cb"),
+  c(
+    "Game NS (within)",
+    "Global NF (within)",
+    "Game NS (between)",
+    "Global NF (between)"
+  ),
+  ~ plotResiduals(sim_resid, form = h2mod$frame[[.x]], main = glue("vs. {.y}"))
+)
+par(mfrow = c(1, 1))
+
+# Temporal autocorrelation (within-person lag-1)
+acf_by_person <- h2mod$frame |>
+  group_by(pid) |>
+  arrange(wave) |>
+  filter(n() >= 3) |>
+  reframe(
+    acf = cor(
+      sim_resid$scaledResiduals[cur_group_rows()][-n()],
+      sim_resid$scaledResiduals[cur_group_rows()][-1],
+      use = "complete.obs"
+    )
+  ) |>
+  pull(acf)
+
+tibble(
+  stat = c("Mean", "Median", "Min", "Max"),
+  lag1_acf = c(
+    mean(acf_by_person),
+    median(acf_by_person),
+    min(acf_by_person),
+    max(acf_by_person)
+  )
+) |>
+  mutate(lag1_acf = round(lag1_acf, 3)) |>
+  print()
+
+# Aggregated residuals
+recalculateResiduals(sim_resid, group = h2mod$frame$wave) |>
+  plot(main = "Residuals by wave")
+recalculateResiduals(sim_resid, group = h2mod$frame$pid) |>
+  plot(main = "Residuals by individual")
 ```
 
 ## Exported Objects
