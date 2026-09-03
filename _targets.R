@@ -61,5 +61,16 @@ list(
     path = "studyb.qmd",
     extra_files = "R/targets/export.R"
   ),
-  export_targets(studyb_export_names, "studyb_report")
+  export_targets(studyb_export_names, "studyb_report"),
+
+  # Supplement: appendix, full model outputs, imputation diagnostics, and
+  # the S1-S9 sensitivity analyses. Reads fitted models / datasets from the
+  # pipeline; the sensitivity models keep their own data/models/ caches.
+  # Produces no exported objects -- a tar_quarto() target only so edits to
+  # R/helpers.R correctly invalidate it.
+  tar_quarto(
+    supplement_report,
+    path = "supplement.qmd",
+    extra_files = "R/helpers.R"
+  )
 )

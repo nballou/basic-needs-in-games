@@ -1,3 +1,56 @@
+# Shared presentation constants for manuscript.qmd / supplement.qmd (and the
+# Study B / diagnostics figures). Colour palette and human-readable labels for
+# the snake_case model terms.
+
+colors <- list(
+  game_ns = "#009988", # Teal for game need satisfaction
+  global_ns = "#44BB99", # Light teal for global need satisfaction
+  global_nf = "#EE6677", # Red for global need frustration
+  nintendo = "#E60012", # Nintendo red
+  xbox = "#107C10", # Xbox green
+  steam = "#215e8a", # Steam dark blue
+  within = "#228833", # Green for within-person variance
+  between = "#BBBBBB" # Gray for between-person variance
+)
+
+labels <- c(
+  # Base variables
+  "game_ns" = "Game need satisfaction",
+  "game_nf" = "Game need frustration",
+  "global_ns" = "Global need satisfaction",
+  "global_nf" = "Global need frustration",
+  "session_length" = "Session length",
+  "session_gap" = "Time to next session",
+  # Within-person
+  "game_ns_cw" = "Game need satisfaction (within)",
+  "game_nf_cw" = "Game need frustration (within)",
+  "global_ns_cw" = "Global need satisfaction (within)",
+  "global_nf_cw" = "Global need frustration (within)",
+  # Between-person
+  "game_ns_cb" = "Game need satisfaction (between)",
+  "game_nf_cb" = "Game need frustration (between)",
+  "global_ns_cb" = "Global need satisfaction (between)",
+  "global_nf_cb" = "Global need frustration (between)",
+  # Within-person (alternate)
+  "game_ns (within-person)" = "Game need satisfaction (within-person)",
+  "global_ns (within-person)" = "Global need satisfaction (within-person)",
+  "global_nf (within-person)" = "Global need frustration (within-person)",
+  # Between-person (alternate)
+  "game_ns (between-person)" = "Game need satisfaction (between-person)",
+  "global_ns (between-person)" = "Global need satisfaction (between-person)",
+  "global_nf (between-person)" = "Global need frustration (between-person)",
+  # Interaction
+  "game_ns_cw:global_nf_cw" = "Game need satisfaction × Global need frustration (within)",
+  # Displacement
+  "displaced_core_domain" = "Displaced core domain",
+  "displaced_core_domainTRUE" = "Displaced core domain",
+  # Variance components
+  "Within-person" = "Within-person",
+  "Between-person" = "Between-person",
+  # Other
+  "(Intercept)" = "Intercept"
+)
+
 report_lmer_term <- function(
   model,
   term,

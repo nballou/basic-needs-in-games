@@ -115,10 +115,10 @@ daily_imputed <- derive_analysis_dat(imp, telemetry_vars)
 dat <- daily_imputed |> filter(.imp > 0)
 dat_desc <- dat |> filter(.imp == 1)
 
-# Slim long frame for the observed-vs-imputed diagnostic figure in
-# supplement.qmd: keeps .imp == 0 (observed) alongside the imputed draws.
-imp_diag <- daily_imputed |>
-  select(.imp, pid, wave, global_ns, global_nf, game_ns)
+# Observed (non-imputed) rows: .imp == 0 from the long frame, all columns.
+# Feeds supplement.qmd's observed-vs-imputed diagnostic figure and the
+# complete-case sensitivity analyses (S2, S4).
+dat_observed <- daily_imputed |> filter(.imp == 0)
 
 message(glue(
   "Main analysis dataset: {n_distinct(dat$pid)} participants, {nrow(dat)} observations"

@@ -8,6 +8,7 @@ project:
     - imputation.qmd
     - modelling.qmd
     - studyb.qmd
+    - supplement.qmd
   preview:
     watch-inputs: true
 

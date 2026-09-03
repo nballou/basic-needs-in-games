@@ -8,23 +8,27 @@
 # preprocessing.qmd: data loading, telemetry, survey enrichment.
 # intake + the two telemetry aggregates feed manuscript.qmd's Method-section
 # tables and descriptive figures (participants table, hour-of-day and
-# platform-usage panels, platform-hours prose). full_eligible_pids is NOT
-# exported -- it is just unique(surveys$pid), derived where needed.
+# platform-usage panels, platform-hours prose). activity_categories carries
+# the free-text activity classification (activity_label) for the H3
+# displaced-category breakdown and the S9 by-domain models.
+# full_eligible_pids is NOT exported -- it is just unique(surveys$pid).
 preprocessing_export_names <- c(
   "surveys",
   "intake",
   "hourly_telemetry",
-  "daily_telemetry"
+  "daily_telemetry",
+  "activity_categories"
 )
 
 # imputation.qmd: MICE + within/between-person centering (tar_load()s from
-# preprocessing.qmd). imp_diag is a slim long frame (including .imp == 0, the
-# observed data) for supplement.qmd's observed-vs-imputed diagnostic figure.
+# preprocessing.qmd). dat_observed is the .imp == 0 (non-imputed) slice of
+# the long frame, for the observed-vs-imputed diagnostic and the
+# complete-case sensitivity analyses.
 imputation_export_names <- c(
   "dat",
   "dat_desc",
   "m_imputations",
-  "imp_diag"
+  "dat_observed"
 )
 
 # studyb.qmd: PowerWash Simulator session prep + the two exploratory
