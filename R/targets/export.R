@@ -5,17 +5,26 @@
 # per name). Extend these vectors as later pipeline phases (PWS, S1-S9) add
 # more exported objects.
 
-# preprocessing.qmd: data loading, telemetry, survey enrichment
+# preprocessing.qmd: data loading, telemetry, survey enrichment.
+# intake + the two telemetry aggregates feed manuscript.qmd's Method-section
+# tables and descriptive figures (participants table, hour-of-day and
+# platform-usage panels, platform-hours prose). full_eligible_pids is NOT
+# exported -- it is just unique(surveys$pid), derived where needed.
 preprocessing_export_names <- c(
-  "surveys"
+  "surveys",
+  "intake",
+  "hourly_telemetry",
+  "daily_telemetry"
 )
 
 # imputation.qmd: MICE + within/between-person centering (tar_load()s from
-# preprocessing.qmd)
+# preprocessing.qmd). imp_diag is a slim long frame (including .imp == 0, the
+# observed data) for supplement.qmd's observed-vs-imputed diagnostic figure.
 imputation_export_names <- c(
   "dat",
   "dat_desc",
-  "m_imputations"
+  "m_imputations",
+  "imp_diag"
 )
 
 # modelling.qmd: H1/H2/H3 (+ later PWS, S1-S9) model fitting (tar_load()s
