@@ -4,19 +4,19 @@ This directory contains the Quarto document for classifying activity description
 
 ## Files
 
-- **categorize_activities.qmd** - Main classification script (in parent `R/` directory)
+- **categorize_activities.qmd** - Main classification script (in `R/utils/`)
 
 ## Generated Artifacts (gitignored)
 
-- **_cache/** - Quarto cache for expensive LLM operations
-- **_files/** - Rendered HTML output files
+- **categorize_activities_cache/** - Quarto cache for expensive LLM operations (sibling to this directory, in `R/utils/`)
+- **categorize_activities_files/** - Rendered HTML output files (sibling to this directory, in `R/utils/`)
 - **_log/** - Real-time progress logs
 
 ## Monitoring Progress
 
 When rendering, monitor real-time progress with:
 ```bash
-tail -f R/categorize_activities/_log/classification_progress.log
+tail -f R/utils/categorize_activities_support/_log/classification_progress.log
 ```
 
 ## Output Data
