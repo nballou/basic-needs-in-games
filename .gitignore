@@ -18,6 +18,13 @@ ms.qmd
 
 # Ignore cached model fits (reproducible but slow)
 /data/models/
+/data/imputation_analytical.csv.gz
+/data/imputation_full.csv.gz
+/data/exports/
+
+# targets pipeline store (regenerated via tar_make())
+/_targets/
+/_targets_r/
 
 .lintr
 settings.json
@@ -74,3 +81,4 @@ rsconnect/
 
 **/*.quarto_ipynb
 FORMATTING_GUIDE.md
+WORKFLOW.md

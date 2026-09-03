@@ -4,6 +4,9 @@ project:
   output-dir: _site
   render:
     - index.qmd
+    - preprocessing.qmd
+    - imputation.qmd
+    - modelling.qmd
   preview:
     watch-inputs: true
 

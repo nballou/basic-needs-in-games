@@ -1,0 +1,136 @@
+---
+title: "Multiple Imputation"
+subtitle: "MICE imputation and within/between-person centering for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+This document runs multiple imputation on the enriched survey data from
+`preprocessing.qmd` and derives the primary analysis dataset (`dat`). It is
+its own `targets` stage (`imputation_report`), separate from data loading and
+from model fitting (`modelling.qmd`) -- so editing a model formula doesn't
+force this (comparatively expensive) imputation to rerun.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(mice)
+library(scales)
+library(targets)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/imputation.R")
+source("R/targets/derive.R")
+```
+
+```{r}
+#| label: load-inputs
+#| code-summary: "Show code (Load preprocessing.qmd's exported objects)"
+
+tar_load(surveys)
+```
+
+## Multiple Imputation
+
+Main analysis imputes the analytical sample (participants with at least 15
+completed daily surveys) using `mice`, with predictive mean matching for
+continuous items and logistic regression for the binary self-reported-play
+item. BANGS (in-game need) items are only imputed for days when the person
+reported playing (or play status is unknown) -- they aren't "missing" on
+non-play days, the question wasn't applicable.
+
+```{r}
+#| label: mice
+#| code-summary: "Show code (Run MICE imputation on analytical sample)"
+#| results: hide
+
+min_waves <- 15
+full_eligible_pids <- unique(surveys$pid)
+
+message(glue(
+  "Imputing analytical sample: {length(unique(surveys$pid[surveys$diaries_completed >= min_waves]))}/{length(full_eligible_pids)} participants with >={min_waves} waves"
+))
+
+telemetry_vars <- surveys |>
+  filter(diaries_completed >= min_waves) |>
+  select(
+    pid,
+    wave,
+    date,
+    telemetry_played_any_24h,
+    play_minutes_24h,
+    telemetry_played_any_12h,
+    play_minutes_12h,
+    telemetry_played_any_6h,
+    play_minutes_6h,
+    telemetry_played_any_24h_pre,
+    play_minutes_24h_pre
+  )
+
+surveys_wide <- build_wide_survey(surveys, min_waves = min_waves)
+
+M_IMPUTATIONS <- 27
+m_imputations <- M_IMPUTATIONS
+
+message(glue(
+  "Running MICE: M={M_IMPUTATIONS}, N={nrow(surveys_wide)}, started {Sys.time()}"
+))
+imp <- run_mice(surveys_wide, m = M_IMPUTATIONS, maxit = 5, seed = 8675309)
+message(glue("Completed {Sys.time()}"))
+
+if (nrow(imp$loggedEvents) > 0) {
+  message(glue("Warning: {nrow(imp$loggedEvents)} logged events during imputation"))
+} else {
+  message("No logged events - imputation completed without issues")
+}
+```
+
+Convert the completed imputations to long format, compute composite need
+scores, and add within/between-person centered predictors:
+
+```{r}
+#| label: post-imputation-centering
+#| code-summary: "Show code (Calculate composites and within/between-person centering)"
+
+daily_imputed <- derive_analysis_dat(imp, telemetry_vars)
+
+# Main analysis dataset: use .imp > 0 (imputed datasets); .imp == 0 is the
+# original data with missingness
+dat <- daily_imputed |> filter(.imp > 0)
+dat_desc <- dat |> filter(.imp == 1)
+
+message(glue(
+  "Main analysis dataset: {n_distinct(dat$pid)} participants, {nrow(dat)} observations"
+))
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for modelling.qmd/manuscript.qmd/supplement.qmd)"
+
+source("R/targets/export.R")
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  imputation_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(imputation_export_names)} objects to data/exports/"))
+```

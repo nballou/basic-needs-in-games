@@ -14,8 +14,8 @@ Key elements of the repo are:
 
 - `index.qmd`, which generates the full manuscript including methods, results, and sensitivity analyses
 - `R/plot_marginal_effects.R`, custom plotting function for visualizing model predictions
-- `R/categorize_activities.qmd`, script for classifying displaced activities into core life domains
-- `R/determine_m_imputations.qmd`, script for determining the number of imputations needed based on fraction of missing information
+- `R/utils/categorize_activities.qmd`, script for classifying displaced activities into core life domains
+- `R/utils/determine_m_imputations.qmd`, script for determining the number of imputations needed based on fraction of missing information
 - `data/models/`, cached model fits to speed up rendering
 - `references.bib`, bibliography for the manuscript
 - `renv.lock`, package versions used in the analysis

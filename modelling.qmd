@@ -1,0 +1,123 @@
+---
+title: "Modelling"
+subtitle: "Primary hypothesis tests for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+This document fits every model reported in the manuscript and supplement:
+the three primary hypothesis tests (H1-H3) here, and (in later pipeline
+phases) Study B and the S1-S9 sensitivity analyses. It is its own `targets`
+stage (`modelling_report`), separate from data loading and imputation -- so
+fixing a model formula only reruns model fitting, not the imputation.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(glmmTMB)
+library(mice)
+library(broom.mixed)
+library(future)
+library(furrr)
+library(targets)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/models_main.R")
+```
+
+```{r}
+#| label: load-inputs
+#| code-summary: "Show code (Load imputation.qmd's exported objects)"
+
+tar_load(c(dat, m_imputations))
+```
+
+## Primary Hypothesis Models
+
+Each model is fit separately to all `r m_imputations` imputed datasets
+(parallelized via `fit_mi_models()`) and pooled using Rubin's rules.
+
+### H1: Game need satisfaction -> global need satisfaction
+
+```{r}
+#| label: h1-model
+#| code-summary: "Show code (Fit H1 models: game NS -> global NS)"
+
+h1_fits <- fit_mi_models(
+  dat,
+  global_ns ~ game_ns_cw + game_ns_cb + (1 + game_ns_cw | pid) + ar1(wave + 0 | pid),
+  m = m_imputations
+)
+h1_pooled <- pool(h1_fits)
+h1mod <- h1_fits[[1]]
+```
+
+### H2: Game need satisfaction + global need frustration -> play
+
+```{r}
+#| label: h2-model
+#| code-summary: "Show code (Fit H2 models: game NS + global NF -> play)"
+
+h2_fits <- fit_mi_models(
+  dat,
+  telemetry_played_any_24h ~
+    game_ns_cw +
+      game_ns_cb +
+      global_nf_cw +
+      global_nf_cb +
+      (1 | pid) +
+      ar1(wave + 0 | pid),
+  m = m_imputations,
+  family = binomial(link = "logit"),
+  ziformula = ~0
+)
+h2_pooled <- pool(h2_fits)
+h2mod <- h2_fits[[1]]
+```
+
+### H3: Displaced core domain -> global need satisfaction
+
+```{r}
+#| label: h3-model
+#| code-summary: "Show code (Fit H3 models: displaced core domain -> global NS)"
+
+h3_fits <- fit_mi_models(
+  dat,
+  global_ns ~
+    displaced_core_domain + (1 + displaced_core_domain | pid) + ar1(wave + 0 | pid),
+  m = m_imputations
+)
+h3_pooled <- pool(h3_fits)
+h3mod <- h3_fits[[1]]
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for manuscript.qmd/supplement.qmd)"
+
+source("R/targets/export.R")
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  modelling_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(modelling_export_names)} objects to data/exports/"))
+```

@@ -1,0 +1,392 @@
+---
+title: "Preprocessing"
+subtitle: "Data loading, cleaning, and enrichment for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+This document downloads and cleans the raw data: Zenodo download, telemetry
+aggregation, and survey enrichment. It is registered as its own `targets`
+target (`preprocessing_report`) in `_targets.R`. Multiple imputation happens
+in `imputation.qmd`, and model fitting in `modelling.qmd` -- each is its own
+pipeline stage, so editing one doesn't force the others to recompute.
+`imputation.qmd` reads this document's exported objects via
+`targets::tar_load()`/`targets::tar_read()`, not by re-running any of this
+code.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/telemetry.R")
+```
+
+## Data Sources
+
+We use two datasets: the Open Play daily-diary study (Study A, this section)
+and PowerWash Simulator telemetry (Study B, added in a later pipeline phase).
+Open Play data are downloaded from Zenodo on first run and cached locally.
+
+```{r}
+#| label: load-data
+#| code-summary: "Show code (Download and load raw data from Zenodo)"
+
+zenodo_url <- "https://zenodo.org/records/21986572/files/digital-wellbeing/open-play-v1.2.5.zip?download=1"
+zip_path <- "data/open-play-v1.2.5.zip"
+
+if (!file.exists(zip_path)) {
+  dir.create(dirname(zip_path), showWarnings = FALSE, recursive = TRUE)
+  options(timeout = max(600, getOption("timeout")))
+  message("Downloading 194MB file from Zenodo (may take a few minutes)...")
+  tryCatch(
+    {
+      download.file(zenodo_url, zip_path, mode = "wb", method = "libcurl")
+      message("Download complete!")
+    },
+    error = function(e) {
+      message("Download failed. Please download manually from:")
+      message(zenodo_url)
+      message(glue("And save to: {normalizePath(zip_path, mustWork = FALSE)}"))
+      stop(e)
+    }
+  )
+}
+
+extract_dir <- "data/open-play-v1.2.5"
+if (!dir.exists(extract_dir)) {
+  message("Extracting zip archive...")
+  unzip(zip_path, exdir = "data")
+  extracted_folder <- list.dirs("data", recursive = FALSE, full.names = TRUE)
+  extracted_folder <- extracted_folder[grepl(
+    "digital-wellbeing-open-play",
+    extracted_folder
+  )]
+  if (length(extracted_folder) == 1 && extracted_folder != extract_dir) {
+    file.rename(extracted_folder, extract_dir)
+  }
+}
+
+intake <- read_csv(
+  file.path(extract_dir, "data/clean/survey_intake.csv.gz"),
+  guess_max = 10000
+)
+surveys <- read_csv(file.path(
+  extract_dir,
+  "data/clean/survey_daily.csv.gz"
+)) |>
+  filter(pid %in% intake$pid)
+xbox <- read_csv(file.path(extract_dir, "data/clean/xbox.csv.gz"))
+nintendo <- read_csv(file.path(extract_dir, "data/clean/nintendo.csv.gz"))
+steam <- read_csv(
+  file.path(extract_dir, "data/clean/steam.csv.gz"),
+  guess_max = 10000
+)
+```
+
+## Telemetry Processing
+
+Session-level Xbox/Nintendo/Steam logs are aggregated into hourly, daily, and
+weekly playtime, with DST-aware local-time conversion (`get_dst_offset()`,
+vendored from the Zenodo archive's own helpers in `R/targets/telemetry.R`).
+
+```{r}
+#| label: prepare-telemetry
+#| code-summary: "Show code (Process telemetry into hourly playtime with timezone adjustments)"
+
+tz_map <- intake |>
+  mutate(
+    pid = as.character(pid),
+    country,
+    local_timezone,
+    .keep = "none"
+  ) |>
+  distinct(pid, .keep_all = TRUE)
+
+sessions_telemetry <- bind_rows(
+  xbox |> mutate(platform = "Xbox"),
+  nintendo |> mutate(platform = "Nintendo")
+) |>
+  left_join(tz_map, by = "pid") |>
+  filter(!is.na(local_timezone)) |>
+  mutate(
+    offset_start = get_dst_offset(session_start, country, local_timezone),
+    offset_end = get_dst_offset(session_end, country, local_timezone),
+    start_local = session_start + offset_start,
+    end_local = session_end + offset_end,
+    duration_min = as.numeric(difftime(
+      session_end,
+      session_start,
+      units = "mins"
+    ))
+  ) |>
+  filter(
+    !is.na(session_start),
+    !is.na(session_end),
+    session_end > session_start,
+    duration_min >= 1
+  )
+
+hourly_from_sessions <- sessions_telemetry |>
+  filter(!is.na(start_local), !is.na(end_local)) |>
+  mutate(
+    h0_local = floor_date(start_local, "hour"),
+    h1_local = floor_date(end_local - seconds(1), "hour"),
+    n_hours = as.integer(difftime(h1_local, h0_local, units = "hours")) + 1
+  ) |>
+  filter(!is.na(n_hours), n_hours > 0) |>
+  tidyr::uncount(n_hours, .remove = FALSE, .id = "k") |>
+  mutate(
+    hour_start_local = h0_local + hours(k - 1),
+    minutes = pmax(
+      0,
+      as.numeric(difftime(
+        pmin(end_local, hour_start_local + hours(1)),
+        pmax(start_local, hour_start_local),
+        units = "mins"
+      ))
+    ),
+    hour_start_utc = with_tz(hour_start_local, tzone = "UTC")
+  ) |>
+  select(pid, platform, title_id, hour_start_local, hour_start_utc, minutes) |>
+  group_by(pid, platform, title_id, hour_start_local, hour_start_utc) |>
+  summarise(minutes = sum(minutes, na.rm = TRUE), .groups = "drop")
+
+hourly_from_steam <- steam |>
+  select(pid, title_id, datetime_hour_start, minutes) |>
+  mutate(pid = as.character(pid)) |>
+  left_join(tz_map, by = "pid") |>
+  filter(!is.na(local_timezone)) |>
+  mutate(
+    platform = "Steam",
+    hour_start_utc = datetime_hour_start,
+    offset = get_dst_offset(datetime_hour_start, country, local_timezone),
+    hour_start_local = datetime_hour_start + offset
+  ) |>
+  select(pid, platform, title_id, hour_start_local, hour_start_utc, minutes) |>
+  group_by(pid, platform, title_id, hour_start_local, hour_start_utc) |>
+  summarise(minutes = sum(minutes, na.rm = TRUE), .groups = "drop")
+
+hourly_telemetry <- bind_rows(hourly_from_sessions, hourly_from_steam)
+
+daily_telemetry <- hourly_telemetry |>
+  mutate(day_local = as.Date(hour_start_local)) |>
+  group_by(pid, platform, day_local) |>
+  summarise(minutes = sum(minutes, na.rm = TRUE), .groups = "drop")
+
+weekly_telemetry <- daily_telemetry |>
+  mutate(week = floor_date(day_local, "week")) |>
+  group_by(pid, platform, week) |>
+  summarise(minutes = sum(minutes, na.rm = TRUE), .groups = "drop")
+
+telemetry_spans <- daily_telemetry |>
+  group_by(pid, platform) |>
+  summarise(
+    telemetry_start = min(day_local, na.rm = TRUE),
+    telemetry_end = max(day_local, na.rm = TRUE) + hours(1),
+    week = floor_date(telemetry_end, "week"),
+    n_weeks = as.integer(difftime(
+      telemetry_end,
+      telemetry_start,
+      units = "weeks"
+    )) +
+      1,
+    .groups = "drop"
+  )
+```
+
+## Survey Preparation
+
+We calculate post-survey play windows (24h, 12h, 6h, and the 24h preceding
+each survey) by joining hourly telemetry against survey timestamps, then
+enrich the survey data with demographics and pre-classified activity
+categories.
+
+```{r}
+#| label: prepare-survey
+#| code-summary: "Show code (Prepare survey data and calculate play windows)"
+
+surveys <- surveys |>
+  filter(!bpnsfs_failed_att_check) |>
+  mutate(wave = as.factor(wave))
+
+play_24h <- surveys |>
+  mutate(
+    survey_time = as.POSIXct(date, tz = "UTC"),
+    window_end = survey_time + hours(24)
+  ) |>
+  left_join(
+    hourly_telemetry |> select(pid, hour_start_utc, minutes),
+    by = join_by(
+      pid,
+      y$hour_start_utc >= x$survey_time,
+      y$hour_start_utc < x$window_end
+    )
+  ) |>
+  summarise(
+    play_minutes_24h = sum(minutes, na.rm = TRUE),
+    .by = c(pid, survey_time)
+  )
+
+play_12h <- surveys |>
+  mutate(
+    survey_time = as.POSIXct(date, tz = "UTC"),
+    window_end = survey_time + hours(12)
+  ) |>
+  left_join(
+    hourly_telemetry |> select(pid, hour_start_utc, minutes),
+    by = join_by(
+      pid,
+      y$hour_start_utc >= x$survey_time,
+      y$hour_start_utc < x$window_end
+    )
+  ) |>
+  summarise(
+    play_minutes_12h = sum(minutes, na.rm = TRUE),
+    .by = c(pid, survey_time)
+  )
+
+play_6h <- surveys |>
+  mutate(
+    survey_time = as.POSIXct(date, tz = "UTC"),
+    window_end = survey_time + hours(6)
+  ) |>
+  left_join(
+    hourly_telemetry |> select(pid, hour_start_utc, minutes),
+    by = join_by(
+      pid,
+      y$hour_start_utc >= x$survey_time,
+      y$hour_start_utc < x$window_end
+    )
+  ) |>
+  summarise(
+    play_minutes_6h = sum(minutes, na.rm = TRUE),
+    .by = c(pid, survey_time)
+  )
+
+play_24h_pre <- surveys |>
+  mutate(
+    survey_time = as.POSIXct(date, tz = "UTC"),
+    window_start = survey_time - hours(24)
+  ) |>
+  left_join(
+    hourly_telemetry |> select(pid, hour_start_utc, minutes),
+    by = join_by(
+      pid,
+      y$hour_start_utc >= x$window_start,
+      y$hour_start_utc < x$survey_time
+    )
+  ) |>
+  summarise(
+    play_minutes_24h_pre = sum(minutes, na.rm = TRUE),
+    .by = c(pid, survey_time)
+  )
+
+intake_aux <- intake |>
+  mutate(
+    gender = ifelse(gender %in% c("Man", "Woman"), gender, "Non-binary/other"),
+    across(wemwbs_1:wemwbs_7, ~ as.numeric(str_extract(.x, "^\\d+"))),
+    wemwbs = rowMeans(pick(wemwbs_1:wemwbs_7), na.rm = TRUE)
+  ) |>
+  select(
+    pid,
+    age,
+    gender,
+    edu_level,
+    employment,
+    marital_status,
+    wemwbs,
+    diaries_completed,
+    self_reported_weekly_play
+  )
+
+activity_categories <- read_csv("data/activity_categories.csv") |>
+  mutate(wave = as.factor(wave))
+
+surveys <- surveys |>
+  mutate(survey_time = as.POSIXct(date, tz = "UTC")) |>
+  left_join(play_24h, by = c("pid", "survey_time")) |>
+  left_join(play_12h, by = c("pid", "survey_time")) |>
+  left_join(play_6h, by = c("pid", "survey_time")) |>
+  left_join(play_24h_pre, by = c("pid", "survey_time")) |>
+  left_join(intake_aux, by = "pid") |>
+  left_join(activity_categories, by = c("pid", "wave")) |>
+  mutate(
+    self_reported_played_24h = played24hr,
+    telemetry_played_any_24h = play_minutes_24h > 0,
+    telemetry_played_any_12h = play_minutes_12h > 0,
+    telemetry_played_any_6h = play_minutes_6h > 0,
+    telemetry_played_any_24h_pre = play_minutes_24h_pre > 0
+  ) |>
+  select(
+    pid,
+    wave,
+    date,
+    age,
+    gender,
+    edu_level,
+    employment,
+    marital_status,
+    wemwbs,
+    diaries_completed,
+    self_reported_weekly_play,
+    self_reported_played_24h,
+    life_sat,
+    bpnsfs_1,
+    bpnsfs_2,
+    bpnsfs_3,
+    bpnsfs_4,
+    bpnsfs_5,
+    bpnsfs_6,
+    bangs_1,
+    bangs_2,
+    bangs_3,
+    bangs_4,
+    bangs_5,
+    bangs_6,
+    displaced_core_domain,
+    telemetry_played_any_24h,
+    play_minutes_24h,
+    telemetry_played_any_12h,
+    play_minutes_12h,
+    telemetry_played_any_6h,
+    play_minutes_6h,
+    telemetry_played_any_24h_pre,
+    play_minutes_24h_pre
+  )
+```
+
+## Exported Objects
+
+The objects downstream pipeline stages need (`imputation.qmd`) are written
+out here and re-exposed as individually `targets::tar_read()`-able targets in
+`_targets.R` (see `R/targets/export.R` for the shared name list).
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for imputation.qmd)"
+
+source("R/targets/export.R")
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  preprocessing_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(preprocessing_export_names)} objects to data/exports/"))
+```
