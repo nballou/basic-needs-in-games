@@ -1948,7 +1948,7 @@ Results indicate that shorter windows post-survey are still unassociated with pl
 
 ### S2: Random effects specification robustness
 
-Random slopes allow associations to vary across individuals, which is theoretically appropriate for these constructs. The main analysis used a random intercept only model due to convergence issues in frequentist estimation. Here we test whether this simplification affects fixed effect estimates by comparing four specifications: (a) no random slopes (main model), (b) random slope for game NS within-person only, (c) random slope for global NF within-person only, and (d) both random slopes simultaneously using Bayesian estimation (which handles complex random effects more robustly).
+Random slopes allow associations to vary across individuals, which is theoretically appropriate for these constructs. The main analysis used a random intercept only model due to convergence issues in frequentist estimation. Here we test whether this simplification affects fixed effect estimates by comparing four specifications: (a) no random slopes (main model), (b) random slope for game NS within-person only, (c) random slope for global NF within-person only, and (d) both random slopes simultaneously using Bayesian estimation (which handles complex random effects more robustly). Because this analysis probes the random-effects structure rather than sample construction, and fitting random slopes over participants with only a few observed days is unstable, S2 is estimated on the >=15-survey subsample.
 
 
 
