@@ -31,7 +31,6 @@ library(broom.mixed)
 library(lubridate)
 
 set.seed(8675309)
-
 ```
 
 ## Load Imputation Object
@@ -48,7 +47,6 @@ imp <- get("imp", envir = .GlobalEnv)
 telemetry_vars <- get("telemetry_vars", envir = .GlobalEnv)
 
 message(glue("Loaded imputation object (M = {imp$m})"))
-
 ```
 
 ## Post-Imputation Centering for Pilot Models
@@ -118,7 +116,6 @@ daily_imputed_pilot <- complete(imp, action = "long", include = FALSE) |>
 message(glue(
   "Prepared {length(unique(daily_imputed_pilot$.imp))} imputations for FMI estimation"
 ))
-
 ```
 
 ## Fit Pilot Models
@@ -169,7 +166,6 @@ h2_pilot_fits <- lapply(1:M_INITIAL, function(i) {
 })
 
 message("✓ Pilot models fitted")
-
 ```
 
 ## Calculate FMI Using Rubin's Rules
@@ -220,7 +216,6 @@ h2_fmi <- h2_pooled$fmi
 
 all_fmi <- c(h1_fmi, h2_fmi)
 max_fmi <- max(all_fmi, na.rm = TRUE)
-
 ```
 
 ## FMI Results
@@ -260,7 +255,6 @@ fmi_table |>
 message(glue(
   "\nMax FMI: {round(max_fmi, 3)} ({fmi_table$model[which.max(all_fmi)]}: {fmi_table$term[which.max(all_fmi)]})"
 ))
-
 ```
 
 ## Diagnostic: High FMI Investigation
@@ -306,7 +300,6 @@ if (nrow(high_fmi_params) > 0) {
     "\nLikely cause: Sparse within-person data + imputed outcome variable"
   )
 }
-
 ```
 
 ## Visualize FMI
@@ -351,7 +344,6 @@ ggplot(fmi_data, aes(x = reorder(term, fmi), y = fmi, fill = model)) +
     legend.position = "top",
     plot.title = element_text(face = "bold")
   )
-
 ```
 
 ## Required M Calculation
@@ -391,7 +383,6 @@ if (required_m > 200) {
 } else {
   message(glue("✓ Current M = {M_INITIAL} is sufficient"))
 }
-
 ```
 
 ## Required M by Parameter
@@ -408,7 +399,7 @@ summary_table <- fmi_table |>
     Estimate = as.numeric(Q_bar),
     SE_pooled = sqrt(as.numeric(U_bar) + (1 + 1 / M_INITIAL) * as.numeric(B)),
     FMI = as.numeric(fmi),
-    Required_M = ceiling(100 * as.numeric(fmi) / cv_target^2)
+    Required_M = ceiling(1 + ((as.numeric(fmi) / cv_target) / 2)^2)
   ) |>
   select(Model, Parameter, Estimate, SE_pooled, FMI, Required_M) |>
   arrange(desc(Required_M))
@@ -433,5 +424,4 @@ message(glue("\nCurrent M = {M_INITIAL}"))
 message(glue(
   "Max required = {max(summary_table$Required_M)} ({summary_table$Parameter[which.max(summary_table$Required_M)]} in {summary_table$Model[which.max(summary_table$Required_M)]})"
 ))
-
 ```

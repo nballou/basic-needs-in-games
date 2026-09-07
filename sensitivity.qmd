@@ -13,12 +13,14 @@ knitr:
 ---
 
 Fits every model behind the S1--S9 sensitivity analyses -- temporal-window
-variants, a Bayesian random-slopes model, a continuous-outcome model,
-complete-case and full-sample and threshold-swept imputations, an
-interaction model, natural-spline models, per-component and need-frustration
-models, and per-domain displacement models. Each fit is cached under
-`data/models/`. The pooled results are read by the manuscript's appendix,
-which renders the tables and figures.
+variants, a Bayesian random-slopes model, a continuous-outcome model, the
+survey-completion-threshold sweep (S4), an interaction model, natural-spline
+models, per-component and need-frustration models, and per-domain
+displacement models. All run on the primary (full) sample except S2, which
+stays on the >=15-survey subsample (see that chunk). The complete-case and
+>=15-subsample H2 fits used by S4 come from `modelling.qmd`
+(`h2_cc_pooled`, `h2_restricted_pooled`). Each fit is cached under
+`data/models/`. The pooled results are read by the manuscript's appendix.
 
 ```{r}
 #| label: libraries
@@ -42,8 +44,17 @@ library(targets)
 #| code-summary: "Show code (Pipeline inputs)"
 
 source("R/targets/export.R")
-tar_load(c(dat, dat_desc, dat_observed, m_imputations, surveys, activity_categories, h2_pooled))
-full_eligible_pids <- unique(surveys$pid)
+tar_load(c(
+  dat,
+  dat_restricted,
+  dat_restricted_complete,
+  m_imputations,
+  surveys,
+  activity_categories,
+  h2_pooled,
+  h2_restricted_pooled,
+  h2_cc_pooled
+))
 ```
 
 ## S1--S9 model fits
@@ -175,6 +186,12 @@ if (file.exists(sens1c_cache_file) && file.exists(sens1c_pooled_file)) {
 #| output: false
 #| code-summary: "Show code (S2: Fit Bayesian model with random slopes)"
 
+# S2 probes the random-effects specification (the frequentist H2 could only
+# fit random intercepts), not sample construction. It is therefore the one
+# sensitivity analysis kept on the >=15-survey subsample: a full Bayesian
+# multiple-imputation refit with random slopes over participants who completed
+# a handful of surveys is disproportionate and prone to divergence.
+
 # File-based caching to avoid re-running across multiple output formats
 sens2_cache_file <- "data/models/sens2_fit.rds"
 
@@ -184,8 +201,8 @@ if (file.exists(sens2_cache_file)) {
 } else {
   message("Fitting S2 Bayesian model...")
 
-  # Use complete cases only
-  dat_complete <- dat_observed |>
+  # Complete cases from the >=15-survey subsample
+  dat_cc <- dat_restricted_complete |>
     filter(
       !is.na(global_ns),
       !is.na(global_nf),
@@ -203,7 +220,7 @@ if (file.exists(sens2_cache_file)) {
       global_nf_cb +
       (1 + game_ns_cw + global_nf_cw | pid),
     family = bernoulli(),
-    data = dat_complete,
+    data = dat_cc,
     chains = 4,
     cores = 4,
     iter = 5000,
@@ -250,11 +267,11 @@ if (
 } else {
   message("Fitting S2 one-slope models...")
 
-  # H2a: Random slope for game_ns_cw only
+  # H2a: Random slope for game_ns_cw only (>=15-survey subsample, as above)
   message("Fitting S2 H2a models...")
   s2_h2a_fits <- lapply(1:m_imputations, function(i) {
     message(glue("Fitting S2 H2a model to imputation {i} of {m_imputations}"))
-    dat_i <- dat |> filter(.imp == i)
+    dat_i <- dat_restricted |> filter(.imp == i)
     glmmTMB(
       telemetry_played_any_24h ~
         game_ns_cw +
@@ -271,11 +288,11 @@ if (
 
   s2_h2a_pooled <- pool(s2_h2a_fits)
 
-  # H2b: Random slope for global_nf_cw only
+  # H2b: Random slope for global_nf_cw only (>=15-survey subsample, as above)
   message("Fitting S2 H2b models...")
   s2_h2b_fits <- lapply(1:m_imputations, function(i) {
     message(glue("Fitting S2 H2b model to imputation {i} of {m_imputations}"))
-    dat_i <- dat |> filter(.imp == i)
+    dat_i <- dat_restricted |> filter(.imp == i)
     glmmTMB(
       telemetry_played_any_24h ~
         game_ns_cw +
@@ -488,360 +505,6 @@ threshold_imps <- map(threshold_values, run_threshold)
 names(threshold_imps) <- threshold_values
 ```
 ```{r}
-#| label: s4-complete-model
-#| output: false
-#| code-summary: "Show code (S4: Fit model on complete cases only)"
-
-# File-based caching to avoid re-running across multiple output formats
-sens4_cache_file <- "data/models/sens4_pooled.rds"
-
-if (file.exists(sens4_cache_file)) {
-  message("Loading cached S4 pooled model")
-  sens4_pooled <- readRDS(sens4_cache_file)
-} else {
-  message("Fitting S4 model...")
-
-  # Use .imp == 0 (original data with missingness)
-  # Filter to complete cases on key variables
-  dat_complete <- dat_observed |>
-    filter(
-      !is.na(global_ns),
-      !is.na(global_nf),
-      !is.na(game_ns),
-      !is.na(game_nf),
-      !is.na(telemetry_played_any_24h)
-    )
-
-  sens4_fit <- glmmTMB(
-    telemetry_played_any_24h ~
-      game_ns_cw +
-      game_ns_cb +
-      global_nf_cw +
-      global_nf_cb +
-      (1 | pid) +
-      ar1(wave + 0 | pid),
-    data = dat_complete,
-    family = binomial(link = "logit"),
-    ziformula = ~0
-  )
-
-  # Complete cases has no missing data to impute, so pooling M identical
-  # fits via mice::pool() reproduces the same estimate/SE as the single fit
-  # (only the Rubin's-rules df differs slightly). Done so this specification
-  # yields the same pooled-summary structure as every other row below.
-  sens4_pooled <- pool(rep(list(sens4_fit), 10))
-
-  # Save to cache
-  saveRDS(sens4_pooled, sens4_cache_file)
-  message("S4 model saved to cache")
-}
-```
-```{r}
-#| label: s4-full-imputation
-#| output: false
-#| code-summary: "Show code (S4: Run imputation on full sample)"
-#| eval: !expr '!file.exists("data/models/sens5_pooled.rds")'
-
-M_FULL_SAMPLE <- 27
-
-message("=== FULL SAMPLE IMPUTATION (PREREGISTERED) ===")
-message(glue(
-  "Imputing all {length(full_eligible_pids)} participants with M={M_FULL_SAMPLE}"
-))
-
-# Separate telemetry (no missing data) - use full sample
-telemetry_vars_full <- surveys |>
-  select(
-    pid,
-    wave,
-    date,
-    telemetry_played_any_24h,
-    play_minutes_24h,
-    telemetry_played_any_12h,
-    play_minutes_12h,
-    telemetry_played_any_6h,
-    play_minutes_6h,
-    telemetry_played_any_24h_pre,
-    play_minutes_24h_pre
-  )
-
-# Convert to wide format for imputation - NO FILTER
-surveys_wide_full <- surveys |>
-  select(
-    pid,
-    wave,
-    age,
-    gender,
-    edu_level,
-    employment,
-    marital_status,
-    wemwbs,
-    diaries_completed,
-    self_reported_weekly_play,
-    self_reported_played_24h,
-    displaced_core_domain,
-    bpnsfs_1,
-    bpnsfs_2,
-    bpnsfs_3,
-    bpnsfs_4,
-    bpnsfs_5,
-    bpnsfs_6,
-    bangs_1,
-    bangs_2,
-    bangs_3,
-    bangs_4,
-    bangs_5,
-    bangs_6
-  ) |>
-  pivot_wider(
-    id_cols = c(
-      pid,
-      age,
-      gender,
-      edu_level,
-      employment,
-      marital_status,
-      wemwbs,
-      diaries_completed,
-      self_reported_weekly_play
-    ),
-    names_from = wave,
-    values_from = c(
-      self_reported_played_24h,
-      displaced_core_domain,
-      bpnsfs_1,
-      bpnsfs_2,
-      bpnsfs_3,
-      bpnsfs_4,
-      bpnsfs_5,
-      bpnsfs_6,
-      bangs_1,
-      bangs_2,
-      bangs_3,
-      bangs_4,
-      bangs_5,
-      bangs_6
-    ),
-    names_sep = "_w"
-  )
-
-# Set up imputation methods (same as analytical sample)
-played_vars_full <- names(surveys_wide_full)[grepl(
-  "^self_reported_played_24h_w",
-  names(surveys_wide_full)
-)]
-bpnsfs_vars_full <- names(surveys_wide_full)[grepl(
-  "^bpnsfs_[1-6]_w",
-  names(surveys_wide_full)
-)]
-bangs_vars_full <- names(surveys_wide_full)[grepl(
-  "^bangs_[1-6]_w",
-  names(surveys_wide_full)
-)]
-displaced_vars_full <- names(surveys_wide_full)[grepl(
-  "^displaced_core_domain_w",
-  names(surveys_wide_full)
-)]
-
-methods_full <- setNames(
-  rep("", ncol(surveys_wide_full)),
-  names(surveys_wide_full)
-)
-methods_full[played_vars_full] <- "logreg"
-methods_full[c(bpnsfs_vars_full, bangs_vars_full, displaced_vars_full)] <- "pmm"
-
-person_level_vars <- c(
-  "pid",
-  "age",
-  "gender",
-  "edu_level",
-  "employment",
-  "marital_status",
-  "wemwbs",
-  "diaries_completed",
-  "self_reported_weekly_play"
-)
-methods_full[person_level_vars] <- ""
-
-# Create WHERE matrix (same conditional imputation logic)
-where_matrix_full <- is.na(surveys_wide_full)
-
-for (bangs_var in bangs_vars_full) {
-  wave_num <- str_extract(bangs_var, "\\d+$")
-  played_var <- paste0("self_reported_played_24h_w", wave_num)
-
-  if (played_var %in% names(surveys_wide_full)) {
-    no_play <- surveys_wide_full[[played_var]] == "No" &
-      is.na(surveys_wide_full[[bangs_var]])
-    where_matrix_full[no_play, bangs_var] <- FALSE
-  }
-}
-
-# Sparse predictor matrix (same settings as analytical)
-pred_full <- quickpred(
-  surveys_wide_full,
-  mincor = 0.3,
-  minpuc = 0.3,
-  include = c("age", "wemwbs", "self_reported_weekly_play"),
-  exclude = c(
-    "pid",
-    "gender",
-    "edu_level",
-    "employment",
-    "marital_status",
-    "diaries_completed"
-  )
-)
-
-# Check if imputation already exists
-imp_file_full <- "data/imputation_full.csv.gz"
-
-if (file.exists(imp_file_full)) {
-  message(glue("Loading existing full sample imputation from {imp_file_full}"))
-  imp_long_full <- read_csv(imp_file_full, show_col_types = FALSE)
-  imp_full <- as.mids(imp_long_full)
-  message(glue("Loaded imputation object (M={imp_full$m})"))
-} else {
-  message(glue("No existing imputation found - running MICE on full sample"))
-
-  message(glue(
-    "Running MICE: M={M_FULL_SAMPLE}, N={nrow(surveys_wide_full)}, started {Sys.time()}"
-  ))
-
-  imp_full <- futuremice(
-    data = surveys_wide_full,
-    m = M_FULL_SAMPLE,
-    method = methods_full,
-    predictorMatrix = pred_full,
-    where = where_matrix_full,
-    maxit = 5,
-    n.core = parallel::detectCores() - 1,
-    parallelseed = 8675309
-  )
-
-  message(glue("Completed {Sys.time()}"))
-
-  # Save imputation results
-  imp_long_full <- complete(imp_full, action = "long", include = TRUE)
-  write_csv(imp_long_full, imp_file_full)
-  message(glue("Saved full sample imputation to {imp_file_full}"))
-
-  if (nrow(imp_full$loggedEvents) > 0) {
-    message(glue(
-      "Warning: {nrow(imp_full$loggedEvents)} logged events during full sample imputation"
-    ))
-  }
-}
-
-# Post-imputation processing for full sample
-daily_imputed_full <- complete(imp_full, action = "long", include = TRUE) |>
-  pivot_longer(
-    cols = -c(
-      .imp,
-      .id,
-      pid,
-      age,
-      gender,
-      edu_level,
-      employment,
-      marital_status,
-      wemwbs,
-      diaries_completed,
-      self_reported_weekly_play
-    ),
-    names_to = c(".value", "wave"),
-    names_pattern = "(.+)_w(.+)"
-  ) |>
-  mutate(wave = as.factor(wave)) |>
-  mutate(
-    global_ns = rowMeans(pick(bpnsfs_1, bpnsfs_3, bpnsfs_5), na.rm = TRUE),
-    global_nf = rowMeans(pick(bpnsfs_2, bpnsfs_4, bpnsfs_6), na.rm = TRUE),
-    game_ns = rowMeans(pick(bangs_1, bangs_3, bangs_5), na.rm = TRUE),
-    game_nf = rowMeans(pick(bangs_2, bangs_4, bangs_6), na.rm = TRUE)
-  ) |>
-  left_join(telemetry_vars_full, by = c("pid", "wave")) |>
-  group_by(.imp, pid) |>
-  mutate(
-    global_ns_pm = mean(global_ns, na.rm = TRUE),
-    global_nf_pm = mean(global_nf, na.rm = TRUE),
-    game_ns_pm = mean(game_ns, na.rm = TRUE),
-    game_nf_pm = mean(game_nf, na.rm = TRUE)
-  ) |>
-  ungroup() |>
-  group_by(.imp) |>
-  mutate(
-    global_ns_gm = mean(global_ns_pm, na.rm = TRUE),
-    global_nf_gm = mean(global_nf_pm, na.rm = TRUE),
-    game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
-    game_nf_gm = mean(game_nf_pm, na.rm = TRUE),
-    global_ns_cw = global_ns - global_ns_pm,
-    global_nf_cw = global_nf - global_nf_pm,
-    game_ns_cw = game_ns - game_ns_pm,
-    game_nf_cw = game_nf - game_nf_pm,
-    global_ns_cb = global_ns_pm - global_ns_gm,
-    global_nf_cb = global_nf_pm - global_nf_gm,
-    game_ns_cb = game_ns_pm - game_ns_gm,
-    game_nf_cb = game_nf_pm - game_nf_gm
-  ) |>
-  ungroup()
-
-message(glue(
-  "Full sample imputation complete: {length(unique(daily_imputed_full$pid))} participants"
-))
-```
-```{r}
-#| label: s4-full-h2-models
-#| output: false
-#| code-summary: "Show code (S4: Fit H2 models to full sample)"
-
-sens5_cache_file <- "data/models/sens5_fits.rds"
-sens5_pooled_file <- "data/models/sens5_pooled.rds"
-
-if (file.exists(sens5_cache_file) && file.exists(sens5_pooled_file)) {
-  message("Loading cached S5 model fits")
-  sens5_fits <- readRDS(sens5_cache_file)
-  sens5_pooled <- readRDS(sens5_pooled_file)
-} else {
-  message("Fitting S5 models to full sample...")
-
-  # Prepare data for modeling
-  dat_full <- daily_imputed_full |>
-    filter(.imp > 0) |>
-    mutate(
-      pid = factor(pid),
-      wave = factor(wave)
-    )
-
-  # Fit H2 model to each imputed dataset
-  sens5_fits <- lapply(1:M_FULL_SAMPLE, function(i) {
-    message(glue("Fitting S5 model to imputation {i} of {M_FULL_SAMPLE}"))
-    dat_i <- dat_full |>
-      filter(.imp == i) |>
-      droplevels()
-    glmmTMB(
-      telemetry_played_any_24h ~
-        game_ns_cw +
-        game_ns_cb +
-        global_nf_cw +
-        global_nf_cb +
-        (1 | pid) +
-        ar1(wave + 0 | pid),
-      data = dat_i,
-      family = binomial(link = "logit"),
-      ziformula = ~0
-    )
-  })
-
-  # Pool estimates
-  sens5_pooled <- pool(sens5_fits)
-
-  # Save to cache
-  saveRDS(sens5_fits, sens5_cache_file)
-  saveRDS(sens5_pooled, sens5_pooled_file)
-  message("S4 (full sample) models saved to cache")
-}
-```
-```{r}
 #| label: s4-threshold-models
 #| output: false
 #| code-summary: "Show code (S4: Fit H2 models across completion thresholds)"
@@ -999,15 +662,18 @@ spec_levels <- c(
   "Complete cases",
   "10",
   "12",
-  "15 (Primary)",
+  ">=15 subsample",
   "18",
   "20",
   "24",
-  "Full sample (preregistered)"
+  "Full sample (primary)"
 )
 
 sample_results <- bind_rows(
-  extract_h2_terms(sens4_pooled) |> mutate(spec = "Complete cases"),
+  # Complete-case and >=15-subsample H2 fits come from modelling.qmd (M=27),
+  # so they match what the main text reports; the threshold sweep is a lighter
+  # M=10 refit that only needs to show the estimate is flat across cutoffs.
+  extract_h2_terms(h2_cc_pooled) |> mutate(spec = "Complete cases"),
   threshold_results |>
     filter(min_waves != 15) |>
     mutate(spec = as.character(min_waves)) |>
@@ -1023,15 +689,12 @@ sample_results <- bind_rows(
       hi,
       spec
     ),
-  # The primary (≥15 waves) specification reuses the main H2 result (M=27)
-  # rather than the M=10 threshold-sweep refit, so it matches what is
-  # reported as the primary result everywhere else in the paper.
-  extract_h2_terms(h2_pooled) |> mutate(spec = "15 (Primary)"),
-  extract_h2_terms(sens5_pooled) |> mutate(spec = "Full sample (preregistered)")
+  extract_h2_terms(h2_restricted_pooled) |> mutate(spec = ">=15 subsample"),
+  extract_h2_terms(h2_pooled) |> mutate(spec = "Full sample (primary)")
 ) |>
   mutate(
     spec = factor(spec, levels = spec_levels),
-    is_primary = spec == "15 (Primary)"
+    is_primary = spec == "Full sample (primary)"
   )
 ```
 ```{r}
@@ -1081,9 +744,9 @@ if (file.exists(sens5b_cache_file) && file.exists(sens5b_pooled_file)) {
 #| output: false
 #| code-summary: "Show code (S6: Fit H2 model with natural splines)"
 
-# Use complete cases only (no imputation)
-# Create this outside caching so it's available for plotting
-dat_complete <- dat |>
+# First imputation only (the linear-vs-spline comparison is illustrative).
+# Created outside caching so it's available for plotting.
+dat_imp1 <- dat |>
   filter(.imp == 1) |>
   select(
     pid,
@@ -1117,7 +780,7 @@ if (file.exists(sens8_linear_file) && file.exists(sens8_spline_file)) {
       global_nf_cb +
       (1 | pid) +
       ar1(factor(wave) + 0 | pid),
-    data = dat_complete,
+    data = dat_imp1,
     family = binomial(link = "logit")
   )
 
@@ -1130,7 +793,7 @@ if (file.exists(sens8_linear_file) && file.exists(sens8_spline_file)) {
       global_nf_cb +
       (1 | pid) +
       ar1(factor(wave) + 0 | pid),
-    data = dat_complete,
+    data = dat_imp1,
     family = binomial(link = "logit")
   )
 

@@ -16,9 +16,11 @@ knitr:
 
 Fits the three primary hypothesis tests (H1-H3) for Study A with `glmmTMB`,
 each fit separately to all 27 imputed datasets and pooled by Rubin's rules,
-and reports convergence checks and residual diagnostics. Study B models are
-in the Study B document; the S1-S9 sensitivity analyses are in the
-supplement.
+and reports convergence checks and residual diagnostics. Each hypothesis is
+fit three ways: on the primary (full) sample -- the headline result -- and,
+as sensitivity analyses reported alongside it, on the >=15-survey subsample
+and on complete cases with no imputation. Study B models are in the Study B
+document; the S1-S9 sensitivity analyses are in the sensitivity document.
 
 ```{r}
 #| label: libraries
@@ -46,13 +48,34 @@ source("R/targets/models_main.R")
 #| label: load-inputs
 #| code-summary: "Show code (Load imputation.qmd's exported objects)"
 
-tar_load(c(dat, m_imputations))
+tar_load(c(dat, dat_restricted, dat_complete, m_imputations))
+```
+
+```{r}
+#| label: formulas
+#| code-summary: "Show code (Hypothesis model formulas)"
+
+# One formula per hypothesis, reused across the primary, >=15-subsample, and
+# complete-case fits. H1 and H3 are linear with a random slope for the focal
+# day-level predictor; H2 is logistic with random intercepts only (random
+# slopes did not converge for the binary outcome). All include AR(1).
+h1_formula <- global_ns ~
+  game_ns_cw + game_ns_cb + (1 + game_ns_cw | pid) + ar1(wave + 0 | pid)
+
+h2_formula <- telemetry_played_any_24h ~
+  game_ns_cw + game_ns_cb + global_nf_cw + global_nf_cb +
+  (1 | pid) + ar1(wave + 0 | pid)
+
+h3_formula <- global_ns ~
+  displaced_core_domain + (1 + displaced_core_domain | pid) + ar1(wave + 0 | pid)
 ```
 
 ## Primary Hypothesis Models
 
 Each model is fit separately to all `r m_imputations` imputed datasets
-(parallelized via `fit_mi_models()`) and pooled using Rubin's rules.
+(parallelized via `fit_mi_models()`) and pooled using Rubin's rules. The
+`*_restricted_pooled` fits repeat this on the >=15-survey subsample; the
+`*_cc_pooled` fits use complete cases only (`fit_cc_model()`).
 
 ### H1: Game need satisfaction -> global need satisfaction
 
@@ -60,13 +83,16 @@ Each model is fit separately to all `r m_imputations` imputed datasets
 #| label: h1-model
 #| code-summary: "Show code (Fit H1 models: game NS -> global NS)"
 
-h1_fits <- fit_mi_models(
-  dat,
-  global_ns ~ game_ns_cw + game_ns_cb + (1 + game_ns_cw | pid) + ar1(wave + 0 | pid),
-  m = m_imputations
-)
+h1_fits <- fit_mi_models(dat, h1_formula, m = m_imputations)
 h1_pooled <- pool(h1_fits)
 h1mod <- h1_fits[[1]]
+
+h1_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted, h1_formula, m = m_imputations
+))
+h1_cc_pooled <- fit_cc_model(
+  dat_complete, h1_formula, key_vars = c("global_ns", "game_ns")
+)
 ```
 
 ### H2: Game need satisfaction + global need frustration -> play
@@ -77,19 +103,28 @@ h1mod <- h1_fits[[1]]
 
 h2_fits <- fit_mi_models(
   dat,
-  telemetry_played_any_24h ~
-    game_ns_cw +
-      game_ns_cb +
-      global_nf_cw +
-      global_nf_cb +
-      (1 | pid) +
-      ar1(wave + 0 | pid),
+  h2_formula,
   m = m_imputations,
   family = binomial(link = "logit"),
   ziformula = ~0
 )
 h2_pooled <- pool(h2_fits)
 h2mod <- h2_fits[[1]]
+
+h2_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted,
+  h2_formula,
+  m = m_imputations,
+  family = binomial(link = "logit"),
+  ziformula = ~0
+))
+h2_cc_pooled <- fit_cc_model(
+  dat_complete,
+  h2_formula,
+  key_vars = c("telemetry_played_any_24h", "game_ns", "global_nf"),
+  family = binomial(link = "logit"),
+  ziformula = ~0
+)
 ```
 
 ### H3: Displaced core domain -> global need satisfaction
@@ -98,14 +133,50 @@ h2mod <- h2_fits[[1]]
 #| label: h3-model
 #| code-summary: "Show code (Fit H3 models: displaced core domain -> global NS)"
 
-h3_fits <- fit_mi_models(
-  dat,
-  global_ns ~
-    displaced_core_domain + (1 + displaced_core_domain | pid) + ar1(wave + 0 | pid),
-  m = m_imputations
-)
+h3_fits <- fit_mi_models(dat, h3_formula, m = m_imputations)
 h3_pooled <- pool(h3_fits)
 h3mod <- h3_fits[[1]]
+
+h3_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted, h3_formula, m = m_imputations
+))
+h3_cc_pooled <- fit_cc_model(
+  dat_complete, h3_formula, key_vars = c("global_ns", "displaced_core_domain")
+)
+```
+
+### Convergence and singularity across primary fits
+
+The primary sample includes participants with very few completed surveys, so
+the H1/H3 random slopes may be estimated as singular for some imputations.
+This tallies convergence codes and near-zero random-slope SDs across the 27
+primary fits; if many fits are singular the random slope should be dropped
+(as it already is for H2) and that documented as a deviation.
+
+```{r}
+#| label: primary-convergence
+#| code-summary: "Show code (Convergence + singularity tally, primary fits)"
+
+slope_sd <- function(fit) {
+  vc <- glmmTMB::VarCorr(fit)$cond$pid
+  sd <- attr(vc, "stddev")
+  if (length(sd) > 1) sd[2] else NA_real_
+}
+
+tibble(
+  hypothesis = c("H1", "H2", "H3"),
+  fits = list(h1_fits, h2_fits, h3_fits)
+) |>
+  mutate(
+    converged = map_int(fits, ~ sum(map_lgl(.x, \(f) f$fit$convergence == 0))),
+    min_slope_sd = map_dbl(fits, ~ min(map_dbl(.x, slope_sd), na.rm = TRUE)),
+    n_singular_slope = map_int(
+      fits,
+      ~ sum(map_dbl(.x, slope_sd) < 1e-4, na.rm = TRUE)
+    )
+  ) |>
+  select(-fits) |>
+  print()
 ```
 
 ## Model Diagnostics

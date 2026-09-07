@@ -14,11 +14,16 @@ knitr:
     message: false
 ---
 
-Runs multiple imputation by chained equations (MICE, M = 27) on the
-analytical-sample survey data, then derives the primary analysis dataset:
-composite need-satisfaction and need-frustration scores from the imputed
-items, joined to the telemetry play measures, with within- and
-between-person centered predictors.
+Runs multiple imputation by chained equations (MICE, M = 27) on the survey
+data, then derives the analysis datasets: composite need-satisfaction and
+need-frustration scores from the imputed items, joined to the telemetry play
+measures, with within- and between-person centered predictors.
+
+Two imputations are run with identical settings. The **primary** imputation
+covers all eligible participants (>=1 completed daily survey -- the
+preregistered imputation target). The **restricted** imputation covers the
+>=15-survey (>=50%) subsample, and is used only for the sample-construction
+sensitivity analysis (S4) and the Bayesian random-slopes check (S2).
 
 ```{r}
 #| label: libraries
@@ -48,80 +53,73 @@ tar_load(surveys)
 
 ## Multiple Imputation
 
-Main analysis imputes the analytical sample (participants with at least 15
-completed daily surveys) using `mice`, with predictive mean matching for
-continuous items and logistic regression for the binary self-reported-play
-item. BANGS (in-game need) items are only imputed for days when the person
-reported playing (or play status is unknown) -- they aren't "missing" on
-non-play days, the question wasn't applicable.
+`mice` is run with predictive mean matching for continuous items and logistic
+regression for the binary self-reported-play item. BANGS (in-game need) items
+are only imputed for days when the person reported playing (or play status is
+unknown) -- they aren't "missing" on non-play days, the question wasn't
+applicable.
 
 ```{r}
 #| label: mice
-#| code-summary: "Show code (Run MICE imputation on analytical sample)"
+#| code-summary: "Show code (Run MICE on the primary and restricted samples)"
 #| results: hide
-
-min_waves <- 15
-full_eligible_pids <- unique(surveys$pid)
-
-message(glue(
-  "Imputing analytical sample: {length(unique(surveys$pid[surveys$diaries_completed >= min_waves]))}/{length(full_eligible_pids)} participants with >={min_waves} waves"
-))
-
-telemetry_vars <- surveys |>
-  filter(diaries_completed >= min_waves) |>
-  select(
-    pid,
-    wave,
-    date,
-    telemetry_played_any_24h,
-    play_minutes_24h,
-    telemetry_played_any_12h,
-    play_minutes_12h,
-    telemetry_played_any_6h,
-    play_minutes_6h,
-    telemetry_played_any_24h_pre,
-    play_minutes_24h_pre
-  )
-
-surveys_wide <- build_wide_survey(surveys, min_waves = min_waves)
 
 M_IMPUTATIONS <- 27
 m_imputations <- M_IMPUTATIONS
 
-message(glue(
-  "Running MICE: M={M_IMPUTATIONS}, N={nrow(surveys_wide)}, started {Sys.time()}"
-))
-imp <- run_mice(surveys_wide, m = M_IMPUTATIONS, maxit = 5, seed = 8675309)
-message(glue("Completed {Sys.time()}"))
+# Telemetry columns joined to the imputed survey data. Passively logged, so
+# never imputed; filtered per-sample to match each imputation's participants.
+telemetry_cols <- c(
+  "pid", "wave", "date",
+  "telemetry_played_any_24h", "play_minutes_24h",
+  "telemetry_played_any_12h", "play_minutes_12h",
+  "telemetry_played_any_6h", "play_minutes_6h",
+  "telemetry_played_any_24h_pre", "play_minutes_24h_pre"
+)
 
-if (nrow(imp$loggedEvents) > 0) {
-  message(glue("Warning: {nrow(imp$loggedEvents)} logged events during imputation"))
-} else {
-  message("No logged events - imputation completed without issues")
+# Impute one survey-completion sample: pivot wide, run MICE, and derive the
+# long analysis frame (item composites + within/between-person centering).
+# min_waves = 0 keeps every participant with at least one completed survey.
+impute_sample <- function(min_waves) {
+  n_pids <- n_distinct(surveys$pid[surveys$diaries_completed >= min_waves])
+  message(glue(
+    "MICE (min_waves={min_waves}): {n_pids} participants, M={M_IMPUTATIONS}, started {Sys.time()}"
+  ))
+  telemetry_vars <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(all_of(telemetry_cols))
+  surveys_wide <- build_wide_survey(surveys, min_waves = min_waves)
+  imp <- run_mice(surveys_wide, m = M_IMPUTATIONS, maxit = 5, seed = 8675309)
+  message(glue(
+    "  completed {Sys.time()} ({nrow(imp$loggedEvents)} logged events)"
+  ))
+  derive_analysis_dat(imp, telemetry_vars)
 }
+
+daily_primary <- impute_sample(min_waves = 0)
+daily_restricted <- impute_sample(min_waves = 15)
 ```
 
-Convert the completed imputations to long format, compute composite need
-scores, and add within/between-person centered predictors:
+Split each imputation into the analysis datasets (`.imp > 0`) and the
+non-imputed slice (`.imp == 0`, used for the observed-vs-imputed diagnostic
+and complete-case analyses):
 
 ```{r}
 #| label: post-imputation-centering
-#| code-summary: "Show code (Calculate composites and within/between-person centering)"
+#| code-summary: "Show code (Split imputed and non-imputed frames)"
 
-daily_imputed <- derive_analysis_dat(imp, telemetry_vars)
-
-# Main analysis dataset: use .imp > 0 (imputed datasets); .imp == 0 is the
-# original data with missingness
-dat <- daily_imputed |> filter(.imp > 0)
+# Primary sample: all eligible participants (preregistered imputation target).
+dat <- daily_primary |> filter(.imp > 0)
 dat_desc <- dat |> filter(.imp == 1)
+dat_complete <- daily_primary |> filter(.imp == 0)
 
-# Observed (non-imputed) rows: .imp == 0 from the long frame, all columns.
-# Feeds supplement.qmd's observed-vs-imputed diagnostic figure and the
-# complete-case sensitivity analyses (S2, S4).
-dat_observed <- daily_imputed |> filter(.imp == 0)
+# Restricted sample: >=15-survey subsample, for S4 and S2 only.
+dat_restricted <- daily_restricted |> filter(.imp > 0)
+dat_restricted_complete <- daily_restricted |> filter(.imp == 0)
 
 message(glue(
-  "Main analysis dataset: {n_distinct(dat$pid)} participants, {nrow(dat)} observations"
+  "Primary: {n_distinct(dat$pid)} participants, {nrow(dat) / m_imputations} rows/imputation. ",
+  "Restricted: {n_distinct(dat_restricted$pid)} participants."
 ))
 ```
 
@@ -129,7 +127,7 @@ message(glue(
 
 ```{r}
 #| label: export
-#| code-summary: "Show code (Export objects for modelling, the manuscript, and the supplement)"
+#| code-summary: "Show code (Export objects for modelling, sensitivity, and the manuscript)"
 
 source("R/targets/export.R")
 dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)

@@ -22,3 +22,13 @@ fit_mi_models <- function(
     .options = furrr::furrr_options(seed = seed)
   )
 }
+
+# Complete-case fit (no imputation): drop rows missing any `key_vars`, fit
+# once, and wrap in mice::pool() so the result has the same pooled-summary
+# structure as the MI fits. With no missing data the between-imputation
+# variance is zero, so the pooled estimate/SE equal the single fit's.
+fit_cc_model <- function(dat, formula, key_vars, family = gaussian(), ...) {
+  cc <- tidyr::drop_na(dat, dplyr::all_of(key_vars))
+  fit <- glmmTMB::glmmTMB(formula, data = cc, family = family, ...)
+  mice::pool(rep(list(fit), 2))
+}
