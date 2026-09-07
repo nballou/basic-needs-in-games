@@ -44,6 +44,11 @@ library(targets)
 #| code-summary: "Show code (Pipeline inputs)"
 
 source("R/targets/export.R")
+
+# Directory for the model-fit caches this document writes (see each chunk's
+# file.exists() guard). Created here so the pipeline survives it being cleared.
+dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+
 tar_load(c(
   dat,
   dat_restricted,
