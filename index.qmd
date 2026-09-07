@@ -2,7 +2,7 @@
 title: |
   All BANG, little buck: Basic psychological needs are weakly linked with video gaming behavior
 abstract: |
-  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behavior, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study A (preregistered) analyzes 11k daily observations from 555 U.S. players with 30 days of multi-platform digital trace data. Study B (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction was robustly associated with subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta data-url >}}.
+  Psychological theories of media use often assume that subjective motivation affects observable behavior. Using video games as a test case, we examine this assumption by pairing repeated self-reports of motivation with objective digital trace data at scale. Across two datasets comprising tens of thousands of hours of gaming behavior, we test predictions derived from self-determination theory and the Basic Needs in Games (BANG) model, which posit that autonomy, competence, and relatedness experiences drive engagement. Study A (preregistered) pairs daily diary surveys with 30 days of multi-platform digital trace data from 1,217 U.S. players. Study B (exploratory) examines 102k sessions from 9k PowerWash Simulator players, linking in-game experience prompts to behavioral logs. In both studies, need satisfaction was robustly associated with subjective states but showed weak or null associations with short-term gaming behavior, including subsequent play, session length, and return latency, across extensive preregistered and robustness analyses. These findings reveal a substantial motivation--behavior gap and suggest that SDT-based accounts may overestimate the role of need satisfaction in explaining when or how much people play. Data and code are available under a {{< meta data-license >}} license at {{< meta data-url >}}.
 author:
   - name: Nick Ballou
     corresponding: true
@@ -144,14 +144,21 @@ tar_load(c(
   activity_categories,
   dat,
   dat_desc,
-  dat_observed,
+  dat_complete,
+  dat_restricted,
   m_imputations,
   h1_pooled,
   h1mod,
+  h1_restricted_pooled,
+  h1_cc_pooled,
   h2_pooled,
   h2mod,
+  h2_restricted_pooled,
+  h2_cc_pooled,
   h3_pooled,
   h3mod,
+  h3_restricted_pooled,
+  h3_cc_pooled,
   pws_m1,
   pws_m2,
   pws_wide,
@@ -326,7 +333,7 @@ As specified in the Stage 1 Registered Report, sample size was determined by fea
 
 All eligibility and exclusion criteria were specified prior to data analysis in Stage 1 and/or documented as deviations in @tbl-deviations. Participants were eligible if they were aged 18+, resided in the U.S., reported playing video games at least 1 hour/week, reported that a substantial share of their gaming occurred on eligible platforms (Nintendo/Xbox/Steam), and successfully linked at least one eligible account with validated recent digital trace data. As documented, two eligibility thresholds were adjusted for feasibility relative to Stage 1: the platform-share requirement was lowered (75% → 50%), and the recent valid trace requirement was extended (7 days → 14 days).
 
-Participants who completed fewer than 15 daily surveys were excluded from the primary (imputed) analyses. The ≥15-survey threshold aligns with the Stage 1 criterion of avoiding analyses that would require imputing more data than collected (≥50%).
+Following the preregistered plan, the primary analyses impute and analyse all eligible participants who completed at least one daily survey. Because imputing a near-complete diary series for participants who responded on only a handful of days is a strong assumption, we also report each hypothesis test on the subsample of participants who completed at least 15 surveys (>=50% of the diary period; @tbl-deviations, @tbl-s4-results) and on complete cases only.
 
 ### Participants
 
@@ -334,15 +341,16 @@ Participants who completed fewer than 15 daily surveys were excluded from the pr
 #| label: participants
 #| code-summary: "Show code (Calculate participant statistics and response rates)"
 
-# Analytic sample (≥15 completions, used in imputed analyses)
-analytic_pids <- dat |>
-  filter(.imp == 1) |>
+# >=15-survey subsample (used in the sample-construction sensitivity analysis)
+subsample_pids <- surveys |>
+  filter(diaries_completed >= 15) |>
   distinct(pid) |>
   pull(pid)
 
-# Prepare participant data with collapsed categories
+# Prepare participant data with collapsed categories. Every eligible
+# participant is in the primary sample; `in_subsample` flags the >=15 subset.
 participant_data <- intake |>
-  filter(pid %in% c(full_eligible_pids, analytic_pids)) |>
+  filter(pid %in% full_eligible_pids) |>
   mutate(
     # Collapse gender to main categories
     gender = ifelse(
@@ -384,15 +392,11 @@ participant_data <- intake |>
       is.na(edu_level) ~ NA_character_,
       TRUE ~ "Other"
     ),
-    # Assign to sample
-    sample = case_when(
-      pid %in% analytic_pids ~ "Analytic sample",
-      TRUE ~ "Full eligible sample"
-    )
+    in_subsample = pid %in% subsample_pids
   ) |>
   select(
     pid,
-    sample,
+    in_subsample,
     age,
     gender,
     ethnicity_collapsed,
@@ -402,29 +406,18 @@ participant_data <- intake |>
   )
 
 # Sample sizes for text
-n_analytic <- sum(participant_data$sample == "Analytic sample")
-n_full <- sum(
-  participant_data$sample %in% c("Analytic sample", "Full eligible sample")
-)
+n_primary <- nrow(participant_data)
+n_subsample <- sum(participant_data$in_subsample)
 
-# Gender summary for analytic sample (for text)
-gender_analytic <- participant_data |>
-  filter(sample == "Analytic sample") |>
+# Gender summary for the primary sample (for text)
+gender_primary <- participant_data |>
   count(gender) |>
-  mutate(pct = 100 * n / sum(n))
+  mutate(pct = round(100 * n / sum(n), 1))
 
-pct_men <- gender_analytic |> filter(gender == "Man") |> pull(pct) |> round(1)
-pct_women <- gender_analytic |>
-  filter(gender == "Woman") |>
-  pull(pct) |>
-  round(1)
-pct_other <- gender_analytic |>
-  filter(gender == "Other gender identity") |>
-  pull(pct) |>
-  round(1)
-
+pull_pct <- function(g) gender_primary |> filter(gender == g) |> pull(pct)
 gender_summary <- glue(
-  "{pct_men}% men, {pct_women}% women, {pct_other}% other gender identities"
+  "{pull_pct('Man')}% men, {pull_pct('Woman')}% women, ",
+  "{pull_pct('Other gender identity')}% other gender identities"
 )
 ```
 
@@ -433,24 +426,23 @@ gender_summary <- glue(
 #| tbl-cap: "Participant characteristics by sample"
 #| code-summary: "Show code (Generate participant demographics table)"
 
-# Build table using map
+# Build table. "Primary sample" is every eligible participant; the subsample
+# column is the >=15-survey subset (a subset of, not disjoint from, the first).
+sub <- participant_data$in_subsample
+
 summary_table <- bind_rows(
   # Sample sizes
   tibble(
     Characteristic = "**N**",
-    `Full sample` = as.character(n_full),
-    `Analytic sample` = as.character(n_analytic)
+    `Primary sample` = as.character(n_primary),
+    `≥15-survey subsample` = as.character(n_subsample)
   ),
 
   # Age
   tibble(
     Characteristic = "Age (years)",
-    `Full sample` = format_mean_sd(
-      participant_data$age[participant_data$sample == "Full eligible sample"]
-    ),
-    `Analytic sample` = format_mean_sd(
-      participant_data$age[participant_data$sample == "Analytic sample"]
-    )
+    `Primary sample` = format_mean_sd(participant_data$age),
+    `≥15-survey subsample` = format_mean_sd(participant_data$age[sub])
   ),
 
   # Categorical demographics
@@ -484,44 +476,32 @@ summary_table <- bind_rows(
   # Gaming behavior section
   tibble(
     Characteristic = "**Gaming behavior**",
-    `Full sample` = "",
-    `Analytic sample` = ""
+    `Primary sample` = "",
+    `≥15-survey subsample` = ""
   ),
 
   tibble(
     Characteristic = "Weekly play (hours)",
-    `Full sample` = format_mean_sd(
-      participant_data$self_reported_weekly_play[
-        participant_data$sample == "Full eligible sample"
-      ] /
-        60
+    `Primary sample` = format_mean_sd(
+      participant_data$self_reported_weekly_play / 60
     ),
-    `Analytic sample` = format_mean_sd(
-      participant_data$self_reported_weekly_play[
-        participant_data$sample == "Analytic sample"
-      ] /
-        60
+    `≥15-survey subsample` = format_mean_sd(
+      participant_data$self_reported_weekly_play[sub] / 60
     )
   ),
 
   # Study engagement section
   tibble(
     Characteristic = "**Study engagement**",
-    `Full sample` = "",
-    `Analytic sample` = ""
+    `Primary sample` = "",
+    `≥15-survey subsample` = ""
   ),
 
   tibble(
     Characteristic = "Surveys completed",
-    `Full sample` = format_mean_sd(
-      participant_data$diaries_completed[
-        participant_data$sample == "Full eligible sample"
-      ]
-    ),
-    `Analytic sample` = format_mean_sd(
-      participant_data$diaries_completed[
-        participant_data$sample == "Analytic sample"
-      ]
+    `Primary sample` = format_mean_sd(participant_data$diaries_completed),
+    `≥15-survey subsample` = format_mean_sd(
+      participant_data$diaries_completed[sub]
     )
   )
 )
@@ -529,14 +509,15 @@ summary_table <- bind_rows(
 # Identify rows for styling
 header_rows <- which(
   str_detect(summary_table$Characteristic, "^\\*\\*") |
-    (summary_table$`Full sample` == "" & summary_table$`Analytic sample` == "")
+    (summary_table$`Primary sample` == "" &
+      summary_table$`≥15-survey subsample` == "")
 )
 indent_rows <- which(str_detect(summary_table$Characteristic, "^    "))
 
 # Create table
 summary_table |>
   tt(
-    notes = "Values are M (SD) or N (%). Ethnicity and education categories collapsed to main levels for clarity."
+    notes = "Values are M (SD) or N (%). Ethnicity and education categories collapsed to main levels for clarity. The >=15-survey subsample is a subset of the primary sample, used for sensitivity analyses."
   ) |>
   format_tt(j = 1, markdown = TRUE) |>
   style_tt(i = header_rows, bold = TRUE) |>
@@ -549,7 +530,7 @@ summary_table |>
   style_tt(i = 0, bold = TRUE)
 ```
 
-The current sample included `r n_analytic` participants (`r gender_summary`) who completed at least 15 daily surveys and were included in the main imputed analyses. The full eligible sample comprised `r n_full` participants who completed at least 1 survey and were included in complete case sensitivity analyses.
+The primary sample comprised `r n_primary` participants (`r gender_summary`) who completed at least one daily survey. Of these, `r n_subsample` completed at least 15 surveys; this subsample is used for the sample-construction sensitivity analyses.
 
 ### Measures
 
@@ -748,26 +729,40 @@ Consistent with Stage 1, we applied preregistered exclusions to telemetry record
 #| label: imputation-missingness
 #| code-summary: "Show code (Quantify missingness for the imputation prose)"
 
-# Reconstruct the analytical-sample wide table and MICE where-matrix (same
-# functions the imputation stage uses) purely to report missingness rates.
-sw_ms <- build_wide_survey(surveys, min_waves = 15)
-mice_setup_ms <- setup_mice_inputs(sw_ms)
-vars_imp_ms <- names(sw_ms)[mice_setup_ms$methods != ""]
+# Reconstruct the MICE where-matrix (same functions the imputation stage
+# uses) for the primary sample and the >=15 subsample, purely to report
+# missingness rates.
+miss_pct <- function(min_waves) {
+  sw <- build_wide_survey(surveys, min_waves = min_waves)
+  where <- setup_mice_inputs(sw)$where
+  scales::number(100 * mean(where), 0.1)
+}
+overall_miss_pct <- miss_pct(0)
+subsample_miss_pct <- miss_pct(15)
 
-overall_miss_pct <- scales::number(100 * mean(mice_setup_ms$where), 0.1)
-pct_ppl_with_missing <- scales::number(
-  100 * mean(rowSums(is.na(sw_ms[vars_imp_ms])) > 0),
-  0.1
+# FMI (fraction of missing information) for the focal within-person terms,
+# from mice::pool(). Reported as the range across H1/H2/H3.
+focal_fmi <- c(
+  h1_pooled$pooled$fmi[h1_pooled$pooled$term == "game_ns_cw"],
+  h2_pooled$pooled$fmi[h2_pooled$pooled$term == "global_nf_cw"],
+  h3_pooled$pooled$fmi[
+    h3_pooled$pooled$term == "displaced_core_domainTRUE"
+  ]
+)
+fmi_range <- glue(
+  "{scales::number(min(focal_fmi), .001)}--{scales::number(max(focal_fmi), .001)}"
 )
 ```
 
-We used multiple imputation by chained equations (MICE) with predictive mean matching (PMM) to handle missing data. Missing data were imputed for daily need satisfaction/frustration items (BPNSFS, BANGS) and displacement measures (an average of `r overall_miss_pct`% missing cells across `r pct_ppl_with_missing`% of participants with at least one wave of missing data). Digital trace data were not imputed because tracking was continuous and automatic; missing data represent recorded absence of play. 
+We used multiple imputation by chained equations (MICE, M = `r m_imputations`) with predictive mean matching for the need satisfaction/frustration items (BPNSFS, BANGS) and displacement measures. The preregistered plan imputes and analyses all eligible participants; because many participants completed few surveys, missingness in the primary sample is high (`r overall_miss_pct`% of imputable cells, versus `r subsample_miss_pct`% in the >=15-survey subsample). Digital trace data were not imputed because tracking was continuous and automatic; missing data represent recorded absence of play. Models were fit separately to each imputed dataset and pooled by Rubin's rules using the `mice` package [@vanBuurenGroothuis-Oudshoorn2011mice].
 
-Following the two-stage protocol from @VonHippel2020How based on fraction of missing information, we used 27 imputations. For all variables, imputed distributions closely overlapped with the observed data (see the Supplement). Models were fit separately to each imputed dataset, and estimates were pooled across imputations using Rubin's rules as implemented in the `mice` package [@vanBuurenGroothuis-Oudshoorn2011mice]. For comparison, complete case analyses are reported in the Appendix (Sensitivity Analysis 4); results do not meaningfully differ from the imputed analyses.
+Because the play outcome for H2 is objective trace data, the fraction of missing information for the focal day-level coefficients is low despite the high cell-level missingness (`r fmi_range` across H1--H3), so `r m_imputations` imputations are sufficient [@VonHippel2020How]. For every hypothesis we report the preregistered primary analysis alongside the >=15-survey subsample and complete-case analyses (@tbl-s4-results); where these diverge in statistical significance we say so explicitly.
 
 ### Deviations from Preregistration
 
 We made several deviations from our preregistration to ensure we could recruit enough high-quality participants to meet our sample size goals. In our view, none are so severe enough to threaten the validity of the study. Deviations are summarized in @tbl-deviations.
+
+Our handling of missing data follows the preregistered plan: multiple imputation of all eligible participants. An earlier version of this Stage 2 report restricted the primary analyses to participants who completed at least 15 surveys; following review, that restriction is now reported only as a sensitivity analysis (@tbl-s4-results).
 
 ::: {.place arguments='top, scope: "parent", float: true'}
 
@@ -783,8 +778,7 @@ tibble(
     "Data collection",
     "Data collection",
     "Data collection",
-    "Data collection",
-    "Analysis"
+    "Data collection"
   ),
   Preregistered = c(
     "All participants sourced from PureProfile",
@@ -792,8 +786,7 @@ tibble(
     "Sample consists of participants aged 18--30",
     "To qualify, >=75% of a participant's total gaming must take place on platforms included in the study (Xbox, Steam, Nintendo Switch)",
     "Qualification contingent upon valid digital trace data within last 7 days",
-    "Daily surveys sent at 7pm local time",
-    "Data would be imputed for all participants given a 50% overall response rate"
+    "Daily surveys sent at 7pm local time"
   ),
   Actual = c(
     "Participants sourced from both PureProfile and Prolific",
@@ -801,8 +794,7 @@ tibble(
     "Sample consists of participants aged 18-40",
     "To qualify, >=50% of a participant's total gaming must take place on platforms included in the study (Xbox, Steam, Nintendo Switch)",
     "Qualification contingent upon valid digital trace data within last 14 days",
-    "Daily surveys sent at 2pm local time",
-    "Data imputed for only participants with an individual 50% response rate"
+    "Daily surveys sent at 2pm local time"
   ),
   `Justification for Deviation` = c(
     "Exhausted PureProfile participant pool before reaching required sample size",
@@ -810,8 +802,7 @@ tibble(
     "(1) Unable to recruit enough participants in the US aged 18--30",
     "Low rates of study qualification at 75% threshold, in large part due to substantial uncaptured Playstation play",
     "Feedback from participants indicating that play during a 7-day period was subject to too many fluctuations (e.g., a busy workweek)",
-    "Feedback from participants indicating that evening plans often interfered with survey completion and thus adversely affected response rate",
-    "Imputing values for participants with 50--97% missing data is poorly justified; results from the preregistered analysis with imputation for all participants are reported in the Appendix (Sensitivity Analysis 5) and do not meaningfully differ from the main analysis"
+    "Feedback from participants indicating that evening plans often interfered with survey completion and thus adversely affected response rate"
   )
 ) |>
   tt() |>
@@ -889,6 +880,10 @@ h1_results <- h1_summary |>
     term = ifelse(term %in% names(labels), labels[term], term),
     across(c(estimate, std.error, statistic), ~ round(.x, 3))
   )
+
+h1_sensitivity <- report_sample_sensitivity(
+  h1_pooled, h1_restricted_pooled, h1_cc_pooled, "game_ns_cw"
+)
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
@@ -914,7 +909,9 @@ plot_relationship(
 
 Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (B = `r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
 
-At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (B = `r h1_agg_est`) was strong, indicating strong between-individual differences. 
+At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (B = `r h1_agg_est`) was strong, indicating strong between-individual differences.
+
+The day-level association was essentially unchanged in the subsample and complete-case analyses (`r h1_sensitivity`).
 
 ### H2. Situational need satisfaction is positively associated with the likelihood of playing in the period after survey completion (H2a), while global need frustration is negatively associated (H2b)
 
@@ -955,6 +952,31 @@ h2b_day_est <- h2b_ests$day_level
 h2b_day_coef <- h2b_ests$day_coef
 h2b_agg_est <- h2b_ests$aggregate
 h2b_agg_coef <- h2b_ests$agg_coef
+
+# Primary / >=15-subsample / complete-case comparison (odds ratios) and FMI,
+# for the sentences reported alongside H2a and H2b.
+h2a_sensitivity <- report_sample_sensitivity(
+  h2_pooled, h2_restricted_pooled, h2_cc_pooled, "game_ns_cw", exponentiate = TRUE
+)
+h2b_sensitivity <- report_sample_sensitivity(
+  h2_pooled, h2_restricted_pooled, h2_cc_pooled, "global_nf_cw", exponentiate = TRUE
+)
+h2b_primary_ep <- report_estimate_p(h2_pooled, "global_nf_cw", exponentiate = TRUE)
+h2b_sub_ep <- report_estimate_p(
+  h2_restricted_pooled, "global_nf_cw", exponentiate = TRUE
+)
+h2b_fmi <- scales::number(
+  h2_pooled$pooled$fmi[h2_pooled$pooled$term == "global_nf_cw"], .001
+)
+
+pull_p <- function(pooled, term_name) {
+  summary(pooled) |> as_tibble() |> filter(term == term_name) |> pull(p.value)
+}
+sig_phrase <- function(p) {
+  if (p < 0.05) "was statistically significant" else "was not statistically significant"
+}
+h2b_primary_sig <- sig_phrase(pull_p(h2_pooled, "global_nf_cw"))
+h2b_sub_sig <- sig_phrase(pull_p(h2_restricted_pooled, "global_nf_cw"))
 ```
 
 ```{r}
@@ -998,7 +1020,7 @@ s2_slopes_globalnf <- pooled_coef(
 s3_gamens_b <- pooled_coef(sens3_pooled, "game_ns_cw")
 s3_globalnf_b <- pooled_coef(sens3_pooled, "global_nf_cw")
 
-# S4: complete cases and full eligible sample (logistic), from the combined
+# S4: complete cases and >=15-survey subsample (logistic), from the combined
 # sample-robustness results
 sample_or <- function(spec_name, term_name) {
   est <- sample_results |>
@@ -1008,8 +1030,8 @@ sample_or <- function(spec_name, term_name) {
 }
 s4_cc_gamens <- sample_or("Complete cases", "game_ns_cw")
 s4_cc_globalnf <- sample_or("Complete cases", "global_nf_cw")
-s4_full_gamens <- sample_or("Full sample (preregistered)", "game_ns_cw")
-s4_full_globalnf <- sample_or("Full sample (preregistered)", "global_nf_cw")
+s4_sub_gamens <- sample_or(">=15 subsample", "game_ns_cw")
+s4_sub_globalnf <- sample_or(">=15 subsample", "global_nf_cw")
 
 # S5: game NS x global NF interaction (logistic). The interaction term
 # exponentiates to a ratio of odds ratios (how much the global NF OR shifts
@@ -1071,22 +1093,25 @@ p_h2a +
 
 We tested H2a and H2b using a single multilevel within-between logistic regression, where in-game need satisfaction and global need frustration (each within- and between-person centered) predicted a binary variable whether any play happened in the 24-hour period after diary survey completion.
 
-Because the outcome is binary, estimates are reported as odds ratios (OR), where 1 indicates no association. Results support neither H2a nor H2b: at the day level, a 1-point higher than usual score on the 7-point scale in game need satisfaction (OR = `r h2a_day_est`) or global need frustration (OR = `r h2b_day_est`) was not meaningfully associated with the odds of subsequent play (see @fig-h2-predictions).
+Because the outcome is binary, estimates are reported as odds ratios (OR), where 1 indicates no association.
 
-We conducted a wide range of sensitivity analyses providing convergent conclusions. key estimates for gaming need satisfaction (game NS) and global need frustration (global NF) remain indistinguishable from the null in models that:
+**H2a.** Day-level game need satisfaction was not meaningfully associated with the odds of subsequent play (OR = `r h2a_day_est`; see @fig-h2-predictions), and this held in the subsample and complete-case analyses (`r h2a_sensitivity`). H2a was not supported.
+
+**H2b.** Support for H2b was weak and not robust. In the preregistered primary analysis, higher day-level global need frustration was associated with slightly lower odds of subsequent play (OR = `r h2b_day_est`), a small effect that `r h2b_primary_sig` (`r h2b_primary_ep`). Restricted to the >=15-survey subsample, the same association `r h2b_sub_sig` (`r h2b_sub_ep`); the complete-case estimate was similar (OR = `r s4_cc_globalnf`). The fraction of missing information for this coefficient was `r h2b_fmi`, so the difference between the primary and restricted results reflects the larger sample rather than imputation noise. Because the effect is negligible and near-identical in magnitude across every specification while its statistical significance depends on which participants are included, we do not treat H2b as robustly supported.
+
+We conducted a wide range of further sensitivity analyses. Key estimates for game need satisfaction (game NS) and global need frustration (global NF) remained small and, for the most part, indistinguishable from the null in models that:
 
 - use subsequent 6 hours (game NS: OR = `r s1_6h_gamens`; global NF: OR = `r s1_6h_globalnf`) or 12 hours (game NS: OR = `r s1_12h_gamens`; global NF: OR = `r s1_12h_globalnf`) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
 - use alternative random slopes specifications (game NS: OR = `r s2_slopes_gamens`; global NF: OR = `r s2_slopes_globalnf`) (Sensitivity Analysis 2)
 - use a linear model of minutes played in the subsequent 24 hours instead of binary play/no-play, where estimates are on the raw scale of minutes rather than odds ratios (game NS: B = `r s3_gamens_b`; global NF: B = `r s3_globalnf_b`) (Sensitivity Analysis 3)
-- use complete case data instead of imputed data (game NS: OR = `r s4_cc_gamens`; global NF: OR = `r s4_cc_globalnf`) (Sensitivity Analysis 4)
-- impute data from the full eligible sample instead of the analytic sample (game NS: OR = `r s4_full_gamens`; global NF: OR = `r s4_full_globalnf`) (Sensitivity Analysis 5)
-- include an interaction between gaming need satisfaction and global need frustration (game NS: OR = `r s5_int_gamens`; global NF: OR = `r s5_int_globalnf`; game NS × global NF: ratio of ORs = `r s5_int_product`) (Sensitivity Analysis 6)
-- use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 7)
-- enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 8)
+- use complete case data or the >=15-survey subsample instead of the primary sample (complete case, game NS: OR = `r s4_cc_gamens`, global NF: OR = `r s4_cc_globalnf`; subsample, game NS: OR = `r s4_sub_gamens`, global NF: OR = `r s4_sub_globalnf`), and sweep the survey-completion threshold from 10 to 24 (Sensitivity Analysis 4)
+- include an interaction between gaming need satisfaction and global need frustration (game NS: OR = `r s5_int_gamens`; global NF: OR = `r s5_int_globalnf`; game NS × global NF: ratio of ORs = `r s5_int_product`) (Sensitivity Analysis 5)
+- use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 6)
+- enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 7)
 
 The 30-day aggregate associations (game need satisfaction: OR = `r h2a_agg_est`; global need frustration: OR = `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics.
 
-In short, results consistently fail to detect an association between situational need satisfaction or global need frustration and subsequent play behavior.
+In short, we find no support for H2a and, at most, weak and fragile support for H2b: situational need satisfaction and global need frustration are at best negligibly associated with subsequent play behavior.
 
 ### H3. When gaming displaces a core life domain, global need satisfaction will be lower
 
@@ -1187,6 +1212,13 @@ h3_ests <- report_wb_estimate(
 
 h3_est <- h3_ests$day_level
 h3_coef <- h3_ests$day_coef
+
+h3_sensitivity <- report_sample_sensitivity(
+  h3_pooled,
+  h3_restricted_pooled,
+  h3_cc_pooled,
+  "displaced_core_domainTRUE"
+)
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
@@ -1271,9 +1303,9 @@ ggplot(h3_data, aes(x = x_numeric, y = global_ns)) +
 
 Participants reported what activity their gaming session displaced `r total_responses` times across the study. In `r n_core` cases (`r pct_core`%), gaming displaced a core life domain: sleep, eating, or fitness (*n* = `r n_sleep`), social engagements (*n* = `r n_social`), work or school (*n* = `r n_work`), or caretaking (*n* = `r n_caretaking`). Gaming most commonly displaced non-core activities such as other digital media use (*n* = `r n_digital_media`) and other leisure activities (*n* = `r n_other_leisure`).
 
-Results provide very weak support for H3 (B = `r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions).
+Results provide very weak support for H3 (B = `r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions). The estimate was similarly small in the subsample and complete-case analyses (`r h3_sensitivity`).
 
-An exploratory analysis (Appendix Sensitivity Analysis 10) examined whether this relationship differed for specific displaced life domains. Results showed that need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
+An exploratory analysis (Appendix Sensitivity Analysis 9) examined whether this relationship differed for specific displaced life domains. Results showed that need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
 
 ```{r}
 #| label: tbl-main-results
@@ -1339,7 +1371,7 @@ bind_rows(h1_combined, h2_combined, h3_combined) |>
     `p` = p.value
   ) |>
   tt(
-    notes = "Estimate is a raw coefficient. H2 has a binary outcome (logistic model); the OR column gives the odds ratio and its 95% CI. H1 and H3 are linear."
+    notes = "Preregistered primary analysis (all eligible participants, multiple imputation). Estimate is a raw coefficient; H2 has a binary outcome (logistic model) and the OR column gives the odds ratio and its 95% CI. Estimates for the >=15-survey subsample and for complete cases are reported in the text and in Table S4."
   ) |>
   style_tt(fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
@@ -1554,7 +1586,7 @@ Our findings are not the first to report weak links between basic needs and gami
 
 ## Implications for the BANG model
 
-Only one of BANG's predictions was supported (H1/B6: game needs are positively associated with global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly: neither in-game positive experiences nor deficits in life in general meaningfully related to subsequent play, and self-reported displacement was negligibly related to wellbeing. All in all, BANG hypotheses B5, B8, and B9 were unsupported in our data.
+Only one of BANG's predictions was supported (H1/B6: game needs are positively associated with global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly. In-game positive experiences were unrelated to subsequent play (H2a), and self-reported displacement was negligibly related to wellbeing (H3). Global need frustration (H2b) was associated with a marginally lower probability of subsequent play in the preregistered analysis, but the effect was negligible in size and its statistical significance did not survive restriction to participants with more complete data, so we do not read it as compensatory play. All in all, BANG hypotheses B5, B8, and B9 were unsupported or, for H2b, at best weakly and inconsistently supported in our data.
 
 Null results for theoretical predictions can generally be attributed to (1) lack of statistical power, (2) validity issues (e.g., poor design, poor measures), (3) incorrect auxiliary hypotheses, or (4) theory failure [@Meehl1990Why]. We argue that our study is reasonably well-powered [see @BallouEtAl2025Psychological for simulated sensitivity analyses], and with the exception of H3 whose "hypothetical displacement" measure has obvious flaws (see Limitations), uses valid measures---in particular, because we observe real-world behavior.
 
@@ -1597,6 +1629,8 @@ Second, our test of displacement (H3) relies on a hypothetical counterfactual me
 Third, the behavioral outcomes examined here reflect short-term engagement patterns, such as session length and return latency. Null or weak associations at this timescale do not rule out need-related effects on longer-term outcomes, such as game choice, persistence over months, or disengagement trajectories. Our conclusions are therefore limited to short-term behavioral dynamics and should not be generalized to all forms of gaming involvement.
 
 Fourth, while the Study A data represent a substantial advancement in capturing comprehensive multi-platform data, they are nonetheless incomplete: players in our sample may have played games on Playstation, played third-party games on Nintendo, or played on mobile (which, while captured, was not captured in sufficient temporal resolution to inform the hypotheses here). Methods for reliably capturing data from each gaming platform require further development.
+
+Fifth, following the preregistration, the primary analyses impute and analyse all eligible participants, including many who completed only a few surveys and whose diary responses are therefore largely imputed. Reassuringly, the day-level estimates were near-identical when the sample was restricted to higher-completion participants or to complete cases, and the fraction of missing information for the focal coefficients was low because the play outcome is observed trace data. The one exception is the borderline statistical significance of H2b, which we discuss above and do not over-interpret.
 
 Finally, our sample, although purposively sampled for racial and gender diversity, should be understood as consisting of engaged 18--40 year old players willing to share detailed behavioral data and complete intensive surveys, rather than as representative of all players. This selectivity limits generalizability in two ways. First, casual players, younger adolescents, and individuals with minimal or highly irregular play patterns are underrepresented. Second, highly engaged players' behavior may differ systematically from those among less engaged populations (e.g,more routinized or more highly habit-driven). The weak need–behavior associations observed here may not generalize to all player groups, nor do they preclude stronger effects in populations with greater variability in motivation or fewer structural constraints.
 
@@ -1683,7 +1717,12 @@ tibble(
   `Observed Outcome` = c(
     "Supported; in-game need satisfaction was positively related to global need satisfaction.",
     "Unsupported; in-game need satisfaction was not related to probability of play in the subsequent 24 hours.",
-    "Unsupported; global need frustration was not related to probability of play in the subsequent 24 hours.",
+    glue(
+      "Not robustly supported; global need frustration was negatively related to the ",
+      "probability of subsequent play in the preregistered analysis ",
+      "(OR = {pooled_coef(h2_pooled, 'global_nf_cw', exponentiate = TRUE)}), but the ",
+      "effect was negligible and its significance was contingent on which participants were included."
+    ),
     "Unsupported; self-reported displacement of a core life domain was not associated with lower global need satisfaction."
   )
 ) |>
@@ -1842,7 +1881,7 @@ modelsummary(
 #| fig-width: 12
 
 # Compare observed vs imputed distributions (pooled across waves)
-bind_rows(dat_observed, dat) |>
+bind_rows(dat_complete, dat) |>
   pivot_longer(
     c(global_ns, global_nf, game_ns),
     names_to = "variable",
@@ -2033,15 +2072,13 @@ summary(sens3_pooled) |>
 
 
 
-### S4: Sample construction and imputation robustness
+### S4: Sample construction robustness
 
-The primary H2 analysis rests on a few choices about how the analytic sample was built: a non-preregistered ≥15 completed-surveys inclusion threshold, and multiple imputation (M=27) restricted to that analytical sample rather than all eligible participants (the preregistered approach). Here we test whether the H2a/H2b estimates depend on these choices by refitting the model under complete cases only (no imputation), the ≥15-wave threshold swept across a range of plausible cutoffs (10-24 completed surveys), and imputation of the full eligible sample rather than just the analytical sample.
-
-Here we also repeat the H2 imputation-based analysis across a range of plausible survey-completion thresholds, to assess whether conclusions depend on the specific ≥15-wave cutoff used in the primary analysis.
+The preregistered primary analysis imputes and analyses all eligible participants, including many who completed only a few surveys. Here we test whether the H2a/H2b estimates depend on restricting the sample to participants with more observed data. We refit the H2 model (i) on complete cases only, with no imputation; (ii) on the >=15-survey subsample (>=50% of the diary period), imputed separately; and (iii) across survey-completion thresholds swept from 10 to 24, to check that the estimate does not hinge on the specific >=15 cutoff.
 
 ```{r}
 #| label: tbl-s4-results
-#| tbl-cap: "S4: H2 estimates (odds ratios) across sample-construction and imputation specifications."
+#| tbl-cap: "S4: H2 estimates (odds ratios) across sample-construction specifications. The full-sample row is the preregistered primary analysis."
 #| code-summary: "Show code (S4: Build combined sample-robustness table)"
 
 sample_results |>
@@ -2074,7 +2111,7 @@ sample_results |>
 
 ```{r}
 #| label: fig-s4-sample-robustness
-#| fig-cap: "S4: H2 estimates (odds ratios) across sample-construction and imputation specifications. Points show pooled odds ratios; bars show 95% confidence intervals (log scale). The primary specification (threshold = 15 waves) is highlighted."
+#| fig-cap: "S4: H2 estimates (odds ratios) across sample-construction specifications. Points show pooled odds ratios; bars show 95% confidence intervals (log scale). The preregistered primary analysis (full sample) is highlighted."
 #| code-summary: "Show code (S4: Plot sample-robustness estimates)"
 
 sample_results |>

@@ -157,6 +157,41 @@ pooled_coef <- function(pooled_obj, term_name, exponentiate = FALSE, accuracy = 
 
   scales::number(if (exponentiate) exp(est) else est, accuracy)
 }
+
+# Format the estimate and p-value for one coefficient from a pooled model,
+# e.g. "B = 0.21, p < .001" or (exponentiate = TRUE) "OR = 0.91, p = .016".
+report_estimate_p <- function(
+  pooled_obj,
+  term_name,
+  exponentiate = FALSE,
+  lbl = if (exponentiate) "OR" else "B"
+) {
+  row <- summary(pooled_obj) |>
+    as_tibble() |>
+    filter(term == term_name)
+  est <- if (exponentiate) exp(row$estimate) else row$estimate
+  p <- row$p.value
+  p_str <- if (p < 0.001) "p < .001" else glue("p = {scales::number(p, .001)}")
+  glue("{lbl} = {scales::number(est, 0.01)}, {p_str}")
+}
+
+# One sentence-fragment comparing a coefficient across the primary,
+# >=15-survey subsample, and complete-case fits, for the sensitivity line
+# reported alongside each hypothesis test.
+report_sample_sensitivity <- function(
+  primary,
+  restricted,
+  cc,
+  term_name,
+  exponentiate = FALSE
+) {
+  f <- function(x) report_estimate_p(x, term_name, exponentiate)
+  glue(
+    "{f(primary)} in the primary sample; ",
+    "{f(restricted)} in the >=15-survey subsample; ",
+    "{f(cc)} for complete cases"
+  )
+}
 # Format helper functions
 format_mean_sd <- function(x) {
   sprintf("%.1f (%.1f)", mean(x, na.rm = TRUE), sd(x, na.rm = TRUE))
@@ -168,32 +203,27 @@ format_n_pct <- function(x, level) {
   sprintf("%d (%.1f%%)", n, pct)
 }
 
-# Function to create categorical breakdown
+# Build one categorical breakdown block for the participant table: a header
+# row plus one row per level. The "Primary sample" column covers every row of
+# `data`; the subsample column covers the rows flagged `data$in_subsample`
+# (participants with >=15 completed surveys).
 create_categorical_section <- function(data, var_name, header, levels) {
-  # Header row
   header_row <- tibble(
     Characteristic = header,
-    `Full sample` = "",
-    `Analytic sample` = ""
+    `Primary sample` = "",
+    `≥15-survey subsample` = ""
   )
 
-  # Level rows
   level_rows <- tibble(level = levels) |>
     mutate(
       Characteristic = glue("    {level}"),
-      `Full sample` = map_chr(
+      `Primary sample` = map_chr(
         level,
-        ~ format_n_pct(
-          data[[var_name]][data$sample == "Full eligible sample"],
-          .x
-        )
+        ~ format_n_pct(data[[var_name]], .x)
       ),
-      `Analytic sample` = map_chr(
+      `≥15-survey subsample` = map_chr(
         level,
-        ~ format_n_pct(
-          data[[var_name]][data$sample == "Analytic sample"],
-          .x
-        )
+        ~ format_n_pct(data[[var_name]][data$in_subsample], .x)
       )
     ) |>
     select(-level)
