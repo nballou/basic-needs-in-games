@@ -14,8 +14,9 @@ Key elements of the repo are:
 
 - `_targets.R`, the analysis pipeline: `preprocessing.qmd` → `imputation.qmd`
   → `modelling.qmd` (Study A), `studyb.qmd` (Study B), all feeding
-  `manuscript.qmd` (main text) and `supplement.qmd` (appendix + sensitivity
-  analyses). Run `targets::tar_make()` to build everything in order.
+  `index.qmd` (the manuscript / site home page) and `supplement.qmd`
+  (appendix + sensitivity analyses). Run `targets::tar_make()` to build
+  everything in order.
 - `R/targets/`, the functions the pipeline stages share
 - `R/helpers.R`, presentation constants and reporting helpers for the
   manuscript and supplement

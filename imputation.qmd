@@ -14,11 +14,11 @@ knitr:
     message: false
 ---
 
-This document runs multiple imputation on the enriched survey data from
-`preprocessing.qmd` and derives the primary analysis dataset (`dat`). It is
-its own `targets` stage (`imputation_report`), separate from data loading and
-from model fitting (`modelling.qmd`) -- so editing a model formula doesn't
-force this (comparatively expensive) imputation to rerun.
+Runs multiple imputation by chained equations (MICE, M = 27) on the
+analytical-sample survey data, then derives the primary analysis dataset:
+composite need-satisfaction and need-frustration scores from the imputed
+items, joined to the telemetry play measures, with within- and
+between-person centered predictors.
 
 ```{r}
 #| label: libraries
@@ -129,7 +129,7 @@ message(glue(
 
 ```{r}
 #| label: export
-#| code-summary: "Show code (Export objects for modelling.qmd/manuscript.qmd/supplement.qmd)"
+#| code-summary: "Show code (Export objects for modelling, the manuscript, and the supplement)"
 
 source("R/targets/export.R")
 dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)

@@ -14,14 +14,11 @@ knitr:
     message: false
 ---
 
-This document downloads and cleans the raw data: Zenodo download, telemetry
-aggregation, and survey enrichment. It is registered as its own `targets`
-target (`preprocessing_report`) in `_targets.R`. Multiple imputation happens
-in `imputation.qmd`, and model fitting in `modelling.qmd` -- each is its own
-pipeline stage, so editing one doesn't force the others to recompute.
-`imputation.qmd` reads this document's exported objects via
-`targets::tar_load()`/`targets::tar_read()`, not by re-running any of this
-code.
+Downloads the raw Open Play data from Zenodo, aggregates the Xbox, Nintendo,
+and Steam telemetry into hourly and daily playtime (with DST-aware local-time
+conversion), and enriches the daily survey data with demographics,
+post-survey play windows, and pre-classified activity categories. The
+cleaned survey table produced here is the input to the multiple imputation.
 
 ```{r}
 #| label: libraries

@@ -14,7 +14,12 @@ pci/
 /data/open-play*/
 /data/open-play*
 /data/pws/
+/data/cache/
 ms.qmd
+
+# Stray render byproducts (quarto drops these next to a directly-rendered doc)
+/*.html
+*.rmarkdown
 
 # Ignore cached model fits (reproducible but slow)
 /data/models/

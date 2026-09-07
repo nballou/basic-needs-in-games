@@ -1,0 +1,10 @@
+/* Site-wide HTML tweaks. Kept minimal; see _quarto.yml for layout/theme. */
+
+/* tinytable renders table notes in <tfoot>, which does not inherit the
+   shrunk cell size set via style_tt(fontsize = ...). Left alone, notes on
+   the manuscript's 0.7em tables render at full body size and look oversized.
+   Bring them down so they read as notes. */
+.tinytable tfoot td {
+  font-size: 0.75em;
+  line-height: 1.3;
+}

@@ -22,7 +22,7 @@ multiple places live here):
   `tar_eval()`-generated export targets
 
 ## `helpers.R`
-Reporting/presentation helpers used by `manuscript.qmd`/`supplement.qmd`
+Reporting/presentation helpers used by `index.qmd` (the manuscript) and `supplement.qmd`
 (`report_wb_estimate()`, `report_lmer_term()`, `plot_relationship()`,
 `clean_results()`, `format_mean_sd()`, `format_n_pct()`,
 `create_categorical_section()`). Pure functions operating on

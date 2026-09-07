@@ -13,7 +13,7 @@ jobs:
       - name: Set up Quarto (pinned)
         uses: quarto-dev/quarto-actions/setup@v2
         with:
-          version: "1.8.25"
+          version: "1.10.18"
       - name: Render (NO EXECUTION; must use _freeze/)
         uses: quarto-dev/quarto-actions/render@v2
         with:

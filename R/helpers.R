@@ -110,8 +110,11 @@ report_lmer_term <- function(
   )
 }
 
-# Extract and clean results from each model (within-person effects only)
-clean_results <- function(pooled_obj, window_name) {
+# Extract and clean results from each model (within-person effects only).
+# Set exponentiate = TRUE to report odds ratios rather than raw log-odds
+# coefficients (for the binary H2 outcome); the point estimate is then shown
+# to two decimal places on the odds-ratio scale.
+clean_results <- function(pooled_obj, window_name, exponentiate = FALSE) {
   summary(pooled_obj) |>
     as_tibble() |>
     filter(
@@ -119,17 +122,40 @@ clean_results <- function(pooled_obj, window_name) {
       term %in% c("game_ns_cw", "global_nf_cw")
     ) |>
     mutate(
+      # summary.mipo() returns `term` as a factor; index labels by the
+      # character value, not the factor's integer codes
+      term = as.character(term),
       term = ifelse(term %in% names(labels), labels[term], term)
     ) |>
     select(term, estimate, p.value) |>
     mutate(
+      point = if (exponentiate) {
+        scales::number(exp(estimate), 0.01)
+      } else {
+        as.character(round(estimate, 3))
+      },
       # Format as "Est (p)"
       result = glue(
-        "{round(estimate, 3)} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
+        "{point} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
       ),
       window = window_name
     ) |>
     select(term, window, result)
+}
+
+# Pull a single pooled coefficient for inline reporting, formatted as a number.
+# Set exponentiate = TRUE for an odds ratio from a logistic model.
+pooled_coef <- function(pooled_obj, term_name, exponentiate = FALSE, accuracy = 0.01) {
+  est <- summary(pooled_obj) |>
+    as_tibble() |>
+    filter(term == term_name) |>
+    pull(estimate)
+
+  if (length(est) != 1) {
+    stop(glue("Term '{term_name}' not found (or not unique) in pooled summary"))
+  }
+
+  scales::number(if (exponentiate) exp(est) else est, accuracy)
 }
 # Format helper functions
 format_mean_sd <- function(x) {
@@ -175,18 +201,53 @@ create_categorical_section <- function(data, var_name, header, levels) {
   bind_rows(header_row, level_rows)
 }
 
-# Report within-between estimates with consistent formatting
+# Report within-between estimates with consistent formatting.
+#
+# By default the estimate is reported on its native scale (a raw coefficient,
+# labelled "B" in the manuscript text). Set exponentiate = TRUE for a logistic
+# model to report an odds ratio instead: the point estimate and its 95% CI are
+# exponentiated (the CI bounds are the exp() of the Wald interval on the
+# log-odds scale) and the SE -- which is not meaningful on the odds-ratio
+# scale -- is omitted from the formatted string.
 report_wb_estimate <- function(
   pooled_summary,
   term_cw,
   term_cb = NULL,
   accuracy = 0.01,
-  stat_label = "t"
+  stat_label = "t",
+  exponentiate = FALSE
 ) {
   # Helper to format p-values consistently
 
   format_p <- function(p) {
     if (p < 0.001) "<.001" else as.character(round(p, 3))
+  }
+
+  # Build the formatted result string for one coefficient row, on either the
+  # raw (B, with SE) or the exponentiated (OR, no SE) scale.
+  format_row <- function(row) {
+    p_str <- format_p(row$p.value)
+    ci_low <- row$estimate - 1.96 * row$std.error
+    ci_high <- row$estimate + 1.96 * row$std.error
+
+    if (exponentiate) {
+      glue(
+        "{number(exp(row$estimate), accuracy)} ",
+        "[95% CI: {number(exp(ci_low), accuracy)}, {number(exp(ci_high), accuracy)}], ",
+        "{stat_label} = {number(row$statistic, accuracy)}, p = {p_str}"
+      )
+    } else {
+      glue(
+        "{number(row$estimate, accuracy)}, SE = {number(row$std.error, accuracy)}, ",
+        "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
+        "{stat_label} = {number(row$statistic, accuracy)}, p = {p_str}"
+      )
+    }
+  }
+
+  # Point estimate alone (odds ratio when exponentiate = TRUE), for interpretation
+  format_coef <- function(row) {
+    number(if (exponentiate) exp(row$estimate) else row$estimate, accuracy)
   }
 
   # Extract day-level estimate with CI and p-value
@@ -197,18 +258,7 @@ report_wb_estimate <- function(
     stop(glue("Term '{term_cw}' not found in pooled summary"))
   }
 
-  day_p <- format_p(day_level_row$p.value)
-  day_level <- day_level_row |>
-    mutate(
-      ci_low = estimate - 1.96 * std.error,
-      ci_high = estimate + 1.96 * std.error,
-      result = glue(
-        "{number(estimate, accuracy)}, SE = {number(std.error, accuracy)}, ",
-        "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
-        "{stat_label} = {number(statistic, accuracy)}, p = {day_p}"
-      )
-    ) |>
-    pull(result)
+  day_level <- format_row(day_level_row)
 
   # Optionally extract 30-day aggregate estimate
   if (!is.null(term_cb)) {
@@ -219,36 +269,17 @@ report_wb_estimate <- function(
       stop(glue("Term '{term_cb}' not found in pooled summary"))
     }
 
-    agg_p <- format_p(aggregate_row$p.value)
-    aggregate <- aggregate_row |>
-      mutate(
-        ci_low = estimate - 1.96 * std.error,
-        ci_high = estimate + 1.96 * std.error,
-        result = glue(
-          "{number(estimate, accuracy)}, SE = {number(std.error, accuracy)}, ",
-          "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
-          "{stat_label} = {number(statistic, accuracy)}, p = {agg_p}"
-        )
-      ) |>
-      pull(result)
-
-    # Also return just the coefficient for interpretation
-    day_coef <- number(day_level_row$estimate, accuracy)
-    agg_coef <- number(aggregate_row$estimate, accuracy)
-
     return(list(
       day_level = day_level,
-      aggregate = aggregate,
-      day_coef = day_coef,
-      agg_coef = agg_coef
+      aggregate = format_row(aggregate_row),
+      day_coef = format_coef(day_level_row),
+      agg_coef = format_coef(aggregate_row)
     ))
   }
 
-  day_coef <- number(day_level_row$estimate, accuracy)
-
   return(list(
     day_level = day_level,
-    day_coef = day_coef
+    day_coef = format_coef(day_level_row)
   ))
 }
 

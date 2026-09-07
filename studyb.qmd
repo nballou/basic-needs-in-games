@@ -14,12 +14,12 @@ knitr:
     message: false
 ---
 
-This document prepares the *PowerWash Simulator* (PWS) session data and fits
-the two exploratory behavioural models reported in the manuscript's Study B.
-It is its own `targets` stage (`studyb_report`), independent of the Study A
-pipeline (`preprocessing.qmd` -> `imputation.qmd` -> `modelling.qmd`) -- it
-shares no data with them. `manuscript.qmd` reads this document's exported
-objects via `targets::tar_load()` and renders the Study B figure and prose.
+Prepares the *PowerWash Simulator* (PWS) session data -- OSF download,
+segmentation of in-game experience prompts into play sessions, and
+within/between-person centering of session-level need satisfaction -- and
+fits the two exploratory behavioural models for Study B: session length and
+time to the next session. PWS is a separate dataset from Study A and shares
+no data with it.
 
 ```{r}
 #| label: libraries
@@ -253,8 +253,8 @@ message(glue(
 
 Two linear mixed models (log outcomes, random intercepts and slopes for
 within-person need satisfaction), each controlling for the previous session's
-value of the outcome. Pooling/prediction and inline reporting happen in
-`manuscript.qmd`.
+value of the outcome. Pooling/prediction and inline reporting happen in the
+manuscript.
 
 ```{r}
 #| label: models
@@ -285,7 +285,7 @@ pws_m2 <- lme4::lmer(
 
 ```{r}
 #| label: export
-#| code-summary: "Show code (Export objects for manuscript.qmd/supplement.qmd)"
+#| code-summary: "Show code (Export objects for the manuscript and supplement)"
 
 dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
 walk(

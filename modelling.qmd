@@ -14,11 +14,11 @@ knitr:
     message: false
 ---
 
-This document fits every model reported in the manuscript and supplement:
-the three primary hypothesis tests (H1-H3) here, and (in later pipeline
-phases) Study B and the S1-S9 sensitivity analyses. It is its own `targets`
-stage (`modelling_report`), separate from data loading and imputation -- so
-fixing a model formula only reruns model fitting, not the imputation.
+Fits the three primary hypothesis tests (H1-H3) for Study A with `glmmTMB`,
+each fit separately to all 27 imputed datasets and pooled by Rubin's rules,
+and reports convergence checks and residual diagnostics. Study B models are
+in the Study B document; the S1-S9 sensitivity analyses are in the
+supplement.
 
 ```{r}
 #| label: libraries
@@ -250,7 +250,7 @@ recalculateResiduals(sim_resid, group = h2mod$frame$pid) |>
 
 ```{r}
 #| label: export
-#| code-summary: "Show code (Export objects for manuscript.qmd/supplement.qmd)"
+#| code-summary: "Show code (Export objects for the manuscript and supplement)"
 
 source("R/targets/export.R")
 dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)

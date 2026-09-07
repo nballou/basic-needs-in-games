@@ -46,13 +46,24 @@ list(
   ),
   export_targets(imputation_export_names, "imputation_report"),
 
-  # H1/H2/H3 (+ later S1-S9) model fitting
+  # H1/H2/H3 confirmatory model fitting
   tar_quarto(
     modelling_report,
     path = "modelling.qmd",
     extra_files = c("R/targets/models_main.R", "R/targets/export.R")
   ),
   export_targets(modelling_export_names, "modelling_report"),
+
+  # S1-S9 sensitivity model fitting. Separate from modelling.qmd so a
+  # sensitivity analysis can be revised without re-running H1-H3. Each fit
+  # keeps its own data/models/ cache. Exports the pooled/summarised results
+  # the manuscript's appendix renders.
+  tar_quarto(
+    sensitivity_report,
+    path = "sensitivity.qmd",
+    extra_files = "R/targets/export.R"
+  ),
+  export_targets(sensitivity_export_names, "sensitivity_report"),
 
   # Study B (PowerWash Simulator): session prep + two behavioural models.
   # Independent branch -- shares no data with the Study A stages above.
@@ -63,23 +74,14 @@ list(
   ),
   export_targets(studyb_export_names, "studyb_report"),
 
-  # Supplement: appendix, full model outputs, imputation diagnostics, and
-  # the S1-S9 sensitivity analyses. Reads fitted models / datasets from the
-  # pipeline; the sensitivity models keep their own data/models/ caches.
-  # Produces no exported objects -- a tar_quarto() target only so edits to
-  # R/helpers.R correctly invalidate it.
-  tar_quarto(
-    supplement_report,
-    path = "supplement.qmd",
-    extra_files = "R/helpers.R"
-  ),
-
-  # Manuscript body: introduction, Study A method + results, Study B, and
-  # discussion. Fits nothing -- every computed object is tar_load()ed from
-  # the pipeline stages above. No exported objects.
+  # Manuscript (index.qmd -- the site home page): introduction, Study A
+  # method + confirmatory results, Study B, discussion, and the full Appendix
+  # (design table, complete model outputs, imputation diagnostics, and the
+  # S1-S9 sensitivity tables/figures). Fits nothing -- every computed object
+  # is tar_load()ed from the pipeline stages above. No exported objects.
   tar_quarto(
     manuscript_report,
-    path = "manuscript.qmd",
+    path = "index.qmd",
     extra_files = c("R/helpers.R", "R/targets/imputation.R")
   )
 )
