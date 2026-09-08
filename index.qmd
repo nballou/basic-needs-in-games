@@ -57,12 +57,14 @@ format:
     toc-depth: 3
     toc-location: right
     number-sections: true
+    css: styles.css
     code-fold: true
     code-summary: "Show code"
     code-tools: true
     embed-resources: false
   docx:
     echo: false
+    reference-doc: manuscript-reference.docx
   preprint-typst:
     echo: false
     wordcount: true
@@ -70,8 +72,11 @@ format:
     citeproc: true
     mainfont: "Liberation Serif"
     sansfont: "Liberation Sans"
+    functions: [place, stat]
     include-before-body:
       - text: "#show <refs>: set par(hanging-indent: 1.4em)"
+      - text: |
+          #let stat(body) = text(font: "DejaVu Sans Mono", size: 0.92em, fill: rgb("#555555"))[#body]
 knitr:
   opts_chunk:
     warning: false
@@ -308,6 +313,7 @@ tibble(
     )
   ) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE, align = "c")
 ```
 
@@ -527,6 +533,7 @@ summary_table |>
   style_tt(i = indent_rows, j = 1, indent = 1) |>
   format_tt(i = indent_rows, j = 1, fn = function(x) str_trim(x)) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -714,6 +721,7 @@ desc_table |>
   ) |>
   group_tt(i = group_rows) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -749,9 +757,9 @@ focal_fmi <- c(
     h3_pooled$pooled$term == "displaced_core_domainTRUE"
   ]
 )
-fmi_range <- glue(
+fmi_range <- stat(glue(
   "{scales::number(min(focal_fmi), .001)}--{scales::number(max(focal_fmi), .001)}"
-)
+))
 ```
 
 We used multiple imputation by chained equations (MICE, M = `r m_imputations`) with predictive mean matching for the need satisfaction/frustration items (BPNSFS, BANGS) and displacement measures. The preregistered plan imputes and analyses all eligible participants; because many participants completed few surveys, missingness in the primary sample is high (`r overall_miss_pct`% of imputable cells, versus `r subsample_miss_pct`% in the >=15-survey subsample). Digital trace data were not imputed because tracking was continuous and automatic; missing data represent recorded absence of play. Models were fit separately to each imputed dataset and pooled by Rubin's rules using the `mice` package [@vanBuurenGroothuis-Oudshoorn2011mice].
@@ -825,9 +833,9 @@ cor_playtime <- cor.test(
   method = "pearson"
 )
 
-cor_playtime_inline <- glue(
+cor_playtime_inline <- stat(glue(
   "r = {number(cor_playtime$estimate, .01)}, 95% CI [{number(cor_playtime$conf.int[1], .01)}, {number(cor_playtime$conf.int[2], .01)}]"
-)
+))
 
 cor_lifesat <- cor.test(
   rowMeans(surveys[, c("bpnsfs_1", "bpnsfs_3", "bpnsfs_5")], na.rm = FALSE),
@@ -835,9 +843,9 @@ cor_lifesat <- cor.test(
   method = "pearson"
 )
 
-cor_lifesat_inline <- glue(
+cor_lifesat_inline <- stat(glue(
   "r = {number(cor_lifesat$estimate, .01)}, 95% CI [{number(cor_lifesat$conf.int[1], .01)}, {number(cor_lifesat$conf.int[2], .01)}]"
-)
+))
 ```
 
 As specified in the preregistration, we assessed three positive controls designed to assess whether our data were capable of addressing our stated hypotheses. All three passed: self-reported playtime correlated positively with logged playtime (`r cor_playtime_inline`); global need satisfaction correlated positively with life satisfaction (`r cor_lifesat_inline`); and after preprocessing (e.g., to remove background sessions), there were no overlapping sessions. We therefore proceeded with the planned analyses.
@@ -869,9 +877,9 @@ h1_ests <- report_wb_estimate(
 )
 
 # Individual variables for inline reporting
-h1_day_est <- h1_ests$day_level
+h1_day_est <- stat(h1_ests$day_level, "B")
 h1_day_coef <- h1_ests$day_coef
-h1_agg_est <- h1_ests$aggregate
+h1_agg_est <- stat(h1_ests$aggregate, "B")
 h1_agg_coef <- h1_ests$agg_coef
 
 h1_results <- h1_summary |>
@@ -881,9 +889,12 @@ h1_results <- h1_summary |>
     across(c(estimate, std.error, statistic), ~ round(.x, 3))
   )
 
-h1_sensitivity <- report_sample_sensitivity(
-  h1_pooled, h1_restricted_pooled, h1_cc_pooled, "game_ns_cw"
-)
+h1_sensitivity <- stat(report_sample_sensitivity(
+  h1_pooled,
+  h1_restricted_pooled,
+  h1_cc_pooled,
+  "game_ns_cw"
+))
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
@@ -907,9 +918,9 @@ plot_relationship(
 
 :::
 
-Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (B = `r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
+Results strongly support H1 (@fig-h1-predictions). At the day level, game need satisfaction was positively associated with global need satisfaction (`r h1_day_est`). On days when participants experienced game need satisfaction 1 scale point (1--7 scale) above their personal 30-day average, they reported global need satisfaction `r h1_day_coef` units above their personal 30-day average. 
 
-At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (B = `r h1_agg_est`) was strong, indicating strong between-individual differences.
+At the 30-day aggregate level, which was not the focus of our hypothesis about day-to-day dynamics, the association (`r h1_agg_est`) was strong, indicating strong between-individual differences.
 
 The day-level association was essentially unchanged in the subsample and complete-case analyses (`r h1_sensitivity`).
 
@@ -934,9 +945,9 @@ h2a_ests <- report_wb_estimate(
   stat_label = "z",
   exponentiate = TRUE
 )
-h2a_day_est <- h2a_ests$day_level
+h2a_day_est <- stat(h2a_ests$day_level, "OR")
 h2a_day_coef <- h2a_ests$day_coef
-h2a_agg_est <- h2a_ests$aggregate
+h2a_agg_est <- stat(h2a_ests$aggregate, "OR")
 h2a_agg_coef <- h2a_ests$agg_coef
 
 # H2b: Global need frustration
@@ -948,32 +959,51 @@ h2b_ests <- report_wb_estimate(
   stat_label = "z",
   exponentiate = TRUE
 )
-h2b_day_est <- h2b_ests$day_level
+h2b_day_est <- stat(h2b_ests$day_level, "OR")
 h2b_day_coef <- h2b_ests$day_coef
-h2b_agg_est <- h2b_ests$aggregate
+h2b_agg_est <- stat(h2b_ests$aggregate, "OR")
 h2b_agg_coef <- h2b_ests$agg_coef
 
 # Primary / >=15-subsample / complete-case comparison (odds ratios) and FMI,
 # for the sentences reported alongside H2a and H2b.
-h2a_sensitivity <- report_sample_sensitivity(
-  h2_pooled, h2_restricted_pooled, h2_cc_pooled, "game_ns_cw", exponentiate = TRUE
-)
+h2a_sensitivity <- stat(report_sample_sensitivity(
+  h2_pooled,
+  h2_restricted_pooled,
+  h2_cc_pooled,
+  "game_ns_cw",
+  exponentiate = TRUE
+))
 h2b_sensitivity <- report_sample_sensitivity(
-  h2_pooled, h2_restricted_pooled, h2_cc_pooled, "global_nf_cw", exponentiate = TRUE
+  h2_pooled,
+  h2_restricted_pooled,
+  h2_cc_pooled,
+  "global_nf_cw",
+  exponentiate = TRUE
 )
-h2b_primary_ep <- report_estimate_p(h2_pooled, "global_nf_cw", exponentiate = TRUE)
-h2b_sub_ep <- report_estimate_p(
-  h2_restricted_pooled, "global_nf_cw", exponentiate = TRUE
-)
-h2b_fmi <- scales::number(
-  h2_pooled$pooled$fmi[h2_pooled$pooled$term == "global_nf_cw"], .001
-)
+h2b_primary_ep <- stat(report_estimate_p(
+  h2_pooled,
+  "global_nf_cw",
+  exponentiate = TRUE
+))
+h2b_sub_ep <- stat(report_estimate_p(
+  h2_restricted_pooled,
+  "global_nf_cw",
+  exponentiate = TRUE
+))
+h2b_fmi <- stat(scales::number(
+  h2_pooled$pooled$fmi[h2_pooled$pooled$term == "global_nf_cw"],
+  .001
+))
 
 pull_p <- function(pooled, term_name) {
   summary(pooled) |> as_tibble() |> filter(term == term_name) |> pull(p.value)
 }
 sig_phrase <- function(p) {
-  if (p < 0.05) "was statistically significant" else "was not statistically significant"
+  if (p < 0.05) {
+    "was statistically significant"
+  } else {
+    "was not statistically significant"
+  }
 }
 h2b_primary_sig <- sig_phrase(pull_p(h2_pooled, "global_nf_cw"))
 h2b_sub_sig <- sig_phrase(pull_p(h2_restricted_pooled, "global_nf_cw"))
@@ -989,36 +1019,38 @@ h2b_sub_sig <- sig_phrase(pull_p(h2_restricted_pooled, "global_nf_cw"))
 # the narrative claim that the focal associations stay near the null.
 
 # S1: shorter post-survey windows (logistic)
-s1_6h_gamens <- pooled_coef(sens1b_pooled, "game_ns_cw", exponentiate = TRUE)
-s1_6h_globalnf <- pooled_coef(
-  sens1b_pooled,
-  "global_nf_cw",
-  exponentiate = TRUE
+s1_6h_gamens <- stat(
+  pooled_coef(sens1b_pooled, "game_ns_cw", exponentiate = TRUE),
+  "OR"
 )
-s1_12h_gamens <- pooled_coef(sens1_pooled, "game_ns_cw", exponentiate = TRUE)
-s1_12h_globalnf <- pooled_coef(
-  sens1_pooled,
-  "global_nf_cw",
-  exponentiate = TRUE
+s1_6h_globalnf <- stat(
+  pooled_coef(sens1b_pooled, "global_nf_cw", exponentiate = TRUE),
+  "OR"
+)
+s1_12h_gamens <- stat(
+  pooled_coef(sens1_pooled, "game_ns_cw", exponentiate = TRUE),
+  "OR"
+)
+s1_12h_globalnf <- stat(
+  pooled_coef(sens1_pooled, "global_nf_cw", exponentiate = TRUE),
+  "OR"
 )
 
 # S2: one random slope at a time (logistic); take each focal term from the
 # model that carries its matching random slope
-s2_slopes_gamens <- pooled_coef(
-  s2_h2a_pooled,
-  "game_ns_cw",
-  exponentiate = TRUE
+s2_slopes_gamens <- stat(
+  pooled_coef(s2_h2a_pooled, "game_ns_cw", exponentiate = TRUE),
+  "OR"
 )
-s2_slopes_globalnf <- pooled_coef(
-  s2_h2b_pooled,
-  "global_nf_cw",
-  exponentiate = TRUE
+s2_slopes_globalnf <- stat(
+  pooled_coef(s2_h2b_pooled, "global_nf_cw", exponentiate = TRUE),
+  "OR"
 )
 
 # S3: linear model of minutes played (Gaussian) -- raw coefficient in minutes,
 # NOT an odds ratio
-s3_gamens_b <- pooled_coef(sens3_pooled, "game_ns_cw")
-s3_globalnf_b <- pooled_coef(sens3_pooled, "global_nf_cw")
+s3_gamens_b <- stat(pooled_coef(sens3_pooled, "game_ns_cw"), "B")
+s3_globalnf_b <- stat(pooled_coef(sens3_pooled, "global_nf_cw"), "B")
 
 # S4: complete cases and >=15-survey subsample (logistic), from the combined
 # sample-robustness results
@@ -1028,24 +1060,25 @@ sample_or <- function(spec_name, term_name) {
     pull(estimate)
   number(exp(est), 0.01)
 }
-s4_cc_gamens <- sample_or("Complete cases", "game_ns_cw")
-s4_cc_globalnf <- sample_or("Complete cases", "global_nf_cw")
-s4_sub_gamens <- sample_or(">=15 subsample", "game_ns_cw")
-s4_sub_globalnf <- sample_or(">=15 subsample", "global_nf_cw")
+s4_cc_gamens <- stat(sample_or("Complete cases", "game_ns_cw"), "OR")
+s4_cc_globalnf <- stat(sample_or("Complete cases", "global_nf_cw"), "OR")
+s4_sub_gamens <- stat(sample_or(">=15 subsample", "game_ns_cw"), "OR")
+s4_sub_globalnf <- stat(sample_or(">=15 subsample", "global_nf_cw"), "OR")
 
 # S5: game NS x global NF interaction (logistic). The interaction term
 # exponentiates to a ratio of odds ratios (how much the global NF OR shifts
 # per 1-point higher game NS), not a plain OR.
-s5_int_gamens <- pooled_coef(sens5b_pooled, "game_ns_cw", exponentiate = TRUE)
-s5_int_globalnf <- pooled_coef(
-  sens5b_pooled,
-  "global_nf_cw",
-  exponentiate = TRUE
+s5_int_gamens <- stat(
+  pooled_coef(sens5b_pooled, "game_ns_cw", exponentiate = TRUE),
+  "OR"
 )
-s5_int_product <- pooled_coef(
-  sens5b_pooled,
-  "game_ns_cw:global_nf_cw",
-  exponentiate = TRUE
+s5_int_globalnf <- stat(
+  pooled_coef(sens5b_pooled, "global_nf_cw", exponentiate = TRUE),
+  "OR"
+)
+s5_int_product <- stat(
+  pooled_coef(sens5b_pooled, "game_ns_cw:global_nf_cw", exponentiate = TRUE),
+  "ratio of ORs"
 )
 ```
 
@@ -1095,23 +1128,23 @@ We tested H2a and H2b using a single multilevel within-between logistic regressi
 
 Because the outcome is binary, estimates are reported as odds ratios (OR), where 1 indicates no association.
 
-**H2a.** Day-level game need satisfaction was not meaningfully associated with the odds of subsequent play (OR = `r h2a_day_est`; see @fig-h2-predictions), and this held in the subsample and complete-case analyses (`r h2a_sensitivity`). H2a was not supported.
+**H2a.** Day-level game need satisfaction was not meaningfully associated with the odds of subsequent play (`r h2a_day_est`; see @fig-h2-predictions), and this held in the subsample and complete-case analyses (`r h2a_sensitivity`). H2a was not supported.
 
-**H2b.** Support for H2b was weak and not robust. In the preregistered primary analysis, higher day-level global need frustration was associated with slightly lower odds of subsequent play (OR = `r h2b_day_est`), a small effect that `r h2b_primary_sig` (`r h2b_primary_ep`). Restricted to the >=15-survey subsample, the same association `r h2b_sub_sig` (`r h2b_sub_ep`); the complete-case estimate was similar (OR = `r s4_cc_globalnf`). The fraction of missing information for this coefficient was `r h2b_fmi`, so the difference between the primary and restricted results reflects the larger sample rather than imputation noise. Because the effect is negligible and near-identical in magnitude across every specification while its statistical significance depends on which participants are included, we do not treat H2b as robustly supported.
+**H2b.** Support for H2b was weak and not robust. In the preregistered primary analysis, higher day-level global need frustration was associated with slightly lower odds of subsequent play (`r h2b_day_est`), a small effect that `r h2b_primary_sig` (`r h2b_primary_ep`). Restricted to the >=15-survey subsample, the same association `r h2b_sub_sig` (`r h2b_sub_ep`); the complete-case estimate was similar (`r s4_cc_globalnf`). The fraction of missing information for this coefficient was `r h2b_fmi`, so the difference between the primary and restricted results reflects the larger sample rather than imputation noise. Because the effect is negligible and near-identical in magnitude across every specification while its statistical significance depends on which participants are included, we do not treat H2b as robustly supported.
 
-We conducted a wide range of further sensitivity analyses. Key estimates for game need satisfaction (game NS) and global need frustration (global NF) remained small and, for the most part, indistinguishable from the null in models that:
+We conducted a wide range of further sensitivity analyses. Key estimates for game need satisfaction and global need frustration remained small and, for the most part, indistinguishable from the null in models that:
 
-- use subsequent 6 hours (game NS: OR = `r s1_6h_gamens`; global NF: OR = `r s1_6h_globalnf`) or 12 hours (game NS: OR = `r s1_12h_gamens`; global NF: OR = `r s1_12h_globalnf`) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
-- use alternative random slopes specifications (game NS: OR = `r s2_slopes_gamens`; global NF: OR = `r s2_slopes_globalnf`) (Sensitivity Analysis 2)
-- use a linear model of minutes played in the subsequent 24 hours instead of binary play/no-play, where estimates are on the raw scale of minutes rather than odds ratios (game NS: B = `r s3_gamens_b`; global NF: B = `r s3_globalnf_b`) (Sensitivity Analysis 3)
-- use complete case data or the >=15-survey subsample instead of the primary sample (complete case, game NS: OR = `r s4_cc_gamens`, global NF: OR = `r s4_cc_globalnf`; subsample, game NS: OR = `r s4_sub_gamens`, global NF: OR = `r s4_sub_globalnf`), and sweep the survey-completion threshold from 10 to 24 (Sensitivity Analysis 4)
-- include an interaction between gaming need satisfaction and global need frustration (game NS: OR = `r s5_int_gamens`; global NF: OR = `r s5_int_globalnf`; game NS × global NF: ratio of ORs = `r s5_int_product`) (Sensitivity Analysis 5)
-- use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 6)
-- enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 7)
+- Use subsequent 6 hours (game need satisfaction: `r s1_6h_gamens`; global need frustration: `r s1_6h_globalnf`) or 12 hours (game need satisfaction: `r s1_12h_gamens`; global need frustration: `r s1_12h_globalnf`) as the outcome, instead of 24 hours (Sensitivity Analysis 1)
+- Use alternative random slopes specifications (game need satisfaction: `r s2_slopes_gamens`; global need frustration: `r s2_slopes_globalnf`) (Sensitivity Analysis 2)
+- Use a linear model of minutes played in the subsequent 24 hours instead of binary play/no-play, where estimates are on the raw scale of minutes rather than odds ratios (game need satisfaction: `r s3_gamens_b`; global need frustration: `r s3_globalnf_b`) (Sensitivity Analysis 3)
+- Use complete case data or the >=15-survey subsample instead of the primary sample (complete case, game NS: `r s4_cc_gamens`, global NF: `r s4_cc_globalnf`; subsample, game need satisfaction: `r s4_sub_gamens`, global need frustration: `r s4_sub_globalnf`), and vary the survey-completion threshold from 10 to 24 (Sensitivity Analysis 4)
+- Include an interaction between gaming need satisfaction and global need frustration (game NS: `r s5_int_gamens`; global need frustration: `r s5_int_globalnf`; game need satisfaction × global NF: `r s5_int_product`) (Sensitivity Analysis 5)
+- Use a spline term for gaming need satisfaction and global need frustration, instead of a linear term (Sensitivity Analysis 6)
+- Enter each individual need (autonomy, competence, relatedness) as predictors instead of composite need satisfaction or frustration (Sensitivity Analysis 7)
 
-The 30-day aggregate associations (game need satisfaction: OR = `r h2a_agg_est`; global need frustration: OR = `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics.
+The 30-day aggregate associations (game need satisfaction: `r h2a_agg_est`; global need frustration: `r h2b_agg_est`) similarly indicate no relationship across individuals; these are reported as exploratory and unrelated to the focal hypotheses about short-term behavioral dynamics.
 
-In short, we find no support for H2a and, at most, weak and fragile support for H2b: situational need satisfaction and global need frustration are at best negligibly associated with subsequent play behavior.
+In short, we find no support for H2a and, at most, weak and fragile support for H2b, indicating that situational need satisfaction and need frustration in daily life are at best negligibly associated with subsequent play behavior.
 
 ### H3. When gaming displaces a core life domain, global need satisfaction will be lower
 
@@ -1210,15 +1243,15 @@ h3_ests <- report_wb_estimate(
   accuracy = 0.01
 )
 
-h3_est <- h3_ests$day_level
+h3_est <- stat(h3_ests$day_level, "B")
 h3_coef <- h3_ests$day_coef
 
-h3_sensitivity <- report_sample_sensitivity(
+h3_sensitivity <- stat(report_sample_sensitivity(
   h3_pooled,
   h3_restricted_pooled,
   h3_cc_pooled,
   "displaced_core_domainTRUE"
-)
+))
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
@@ -1303,9 +1336,11 @@ ggplot(h3_data, aes(x = x_numeric, y = global_ns)) +
 
 Participants reported what activity their gaming session displaced `r total_responses` times across the study. In `r n_core` cases (`r pct_core`%), gaming displaced a core life domain: sleep, eating, or fitness (*n* = `r n_sleep`), social engagements (*n* = `r n_social`), work or school (*n* = `r n_work`), or caretaking (*n* = `r n_caretaking`). Gaming most commonly displaced non-core activities such as other digital media use (*n* = `r n_digital_media`) and other leisure activities (*n* = `r n_other_leisure`).
 
-Results provide very weak support for H3 (B = `r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions). The estimate was similarly small in the subsample and complete-case analyses (`r h3_sensitivity`).
+Results provide very weak support for H3 (`r h3_est`). When gaming displaced a core life domain rather than a non-core activity, participants reported global need satisfaction `r h3_coef` units lower on average. On a 7-point scale, this difference is extremely small, and the distributions of global need satisfaction when gaming displaced core vs. non-core domains are nearly identical (@fig-h3-predictions). The estimate was similarly small in the subsample and complete-case analyses (`r h3_sensitivity`).
 
 An exploratory analysis (Appendix Sensitivity Analysis 9) examined whether this relationship differed for specific displaced life domains. Results showed that need satisfaction was lower when gaming displaced work/school responsibilities and sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking. 
+
+::: {.place arguments='top, scope: "parent", float: true'}
 
 ```{r}
 #| label: tbl-main-results
@@ -1374,8 +1409,11 @@ bind_rows(h1_combined, h2_combined, h3_combined) |>
     notes = "Preregistered primary analysis (all eligible participants, multiple imputation). Estimate is a raw coefficient; H2 has a binary outcome (logistic model) and the OR column gives the odds ratio and its 95% CI. Estimates for the >=15-survey subsample and for complete cases are reported in the text and in Table S4."
   ) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
+
+:::
 
 # Study B: Exploratory Evidence from PowerWash Simulator
 
@@ -1469,10 +1507,19 @@ pws_m2_max_eff <- pred_m2 |>
   ) |>
   pull()
 
-pws_m1_est <- report_lmer_term(pws_m1, "game_ns_cw", p_method = "wald_z")
-pws_m2_est <- report_lmer_term(pws_m2, "game_ns_cw", p_method = "wald_z")
+pws_m1_est <- stat(
+  report_lmer_term(pws_m1, "game_ns_cw", p_method = "wald_z"),
+  "B"
+)
+pws_m2_est <- stat(
+  report_lmer_term(pws_m2, "game_ns_cw", p_method = "wald_z"),
+  "B"
+)
 
-game_ns_sd <- number(sd(pws_wide$game_ns_cw, na.rm = TRUE), .01)
+game_ns_sd <- stat(
+  number(sd(pws_wide$game_ns_cw, na.rm = TRUE), .01),
+  "within-person SD"
+)
 ```
 
 ::: {.place arguments='top, scope: "parent", float: true'}
@@ -1572,9 +1619,9 @@ p_m1 +
 
 ## Study B Results: Exploratory
 
-Results are shown in @fig-study2-results. At the session level, game need satisfaction was weakly and non-significantly correlated with session length (B = `r pws_m1_est`). Panel A illustrates that when players experienced higher need satisfaction than their personal average, they did not play meaningfully longer: if a player who typically reported need satisfaction of 1 instead reported a 7, their expected change in session length would be only `r pws_m1_max_eff`.
+Results are shown in @fig-study2-results. At the session level, game need satisfaction was weakly and non-significantly correlated with session length (`r pws_m1_est`). Panel A illustrates that when players experienced higher need satisfaction than their personal average, they did not play meaningfully longer: if a player who typically reported need satisfaction of 1 instead reported a 7, their expected change in session length would be only `r pws_m1_max_eff`.
 
-Similarly, game need satisfaction showed a weak association with time to next session (B = `r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 7, their next session would begin `r pws_m2_max_eff` sooner than usual. While this association is significant, given that typical session-to-session deviations in need satisfaction are much smaller (within-person SD = `r game_ns_sd` points), we interpret the practical relevance to behavior as small.
+Similarly, game need satisfaction showed a weak association with time to next session (`r pws_m2_est`). Panel B shows that if a player who typically reported need satisfaction of 1 instead reported a 7, their next session would begin `r pws_m2_max_eff` sooner than usual. While this association is significant, given that typical session-to-session deviations in need satisfaction are much smaller (`r game_ns_sd` points), we interpret the practical relevance to behavior as small.
 
 Broadly, results therefore converge with Study A: Despite examining `r pws_n_sessions_fmt` sessions from `r pws_n_players_fmt` players in a different game using different measures, the pattern of weak behavioral associations replicated. Full model outputs are provided in the Supplement.
 
@@ -1660,6 +1707,24 @@ We used Claude Code to implement and refactor some aspects of the analysis code,
 
 {{< pagebreak >}}
 
+# References
+
+::: {#refs}
+:::
+
+{{< pagebreak >}}
+
+```{=typst}
+// Appendix: single column (jou is two-column), A-prefixed table/figure
+// numbering, and a page break before every subsection so each output
+// stands alone. Headings stay unnumbered, matching the rest of the paper.
+#show: appendix.with(prefix: "A")
+#set heading(numbering: none)
+#set figure(numbering: it => [A#it])
+#show heading.where(level: 2): it => { pagebreak(weak: true); it }
+#show heading.where(level: 3): it => { pagebreak(weak: true); it }
+```
+
 # Appendix
 
 ## Design Table
@@ -1718,10 +1783,10 @@ tibble(
     "Supported; in-game need satisfaction was positively related to global need satisfaction.",
     "Unsupported; in-game need satisfaction was not related to probability of play in the subsequent 24 hours.",
     glue(
-      "Not robustly supported; global need frustration was negatively related to the ",
-      "probability of subsequent play in the preregistered analysis ",
-      "(OR = {pooled_coef(h2_pooled, 'global_nf_cw', exponentiate = TRUE)}), but the ",
-      "effect was negligible and its significance was contingent on which participants were included."
+      "Not supported; global need frustration was negatively related to the ",
+      "probability of subsequent play in the preregistered analysis (opposite as expected)",
+      "(OR = {pooled_coef(h2_pooled, 'global_nf_cw', exponentiate = TRUE)}); the ",
+      "effect was negligible, and its significance was highly contingent on imputation strategy."
     ),
     "Unsupported; self-reported displacement of a core life domain was not associated with lower global need satisfaction."
   )
@@ -1734,6 +1799,7 @@ tibble(
   style_tt(i = 1, j = 6, rowspan = 4, alignv = "m") |>
   style_tt(i = 2, j = 4, rowspan = 2, alignv = "m") |>
   style_tt(fontsize = 0.6) |>
+  style_tt(i = "notes", fontsize = 0.6) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -2074,7 +2140,7 @@ summary(sens3_pooled) |>
 
 ### S4: Sample construction robustness
 
-The preregistered primary analysis imputes and analyses all eligible participants, including many who completed only a few surveys. Here we test whether the H2a/H2b estimates depend on restricting the sample to participants with more observed data. We refit the H2 model (i) on complete cases only, with no imputation; (ii) on the >=15-survey subsample (>=50% of the diary period), imputed separately; and (iii) across survey-completion thresholds swept from 10 to 24, to check that the estimate does not hinge on the specific >=15 cutoff.
+The preregistered primary analysis imputes and analyses all eligible participants, including many who completed only a few surveys. Here we test whether the H2a/H2b estimates depend on restricting the sample to participants with more observed data. We refit the H2 model (i) on complete cases only, with no imputation; (ii) on the >=15-survey subsample (>=50% of the diary period), imputed separately; and (iii) across other survey completion thresholds from 10 to 24, to check that the estimate does not hinge on the specific >=15 cutoff.
 
 ```{r}
 #| label: tbl-s4-results
@@ -2106,6 +2172,7 @@ sample_results |>
     )
   ) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = c(0, 1, 10), bold = TRUE)
 ```
 
@@ -2176,6 +2243,7 @@ summary(sens5b_pooled) |>
     notes = "Odds ratios (binary H2 outcome). The interaction term is a ratio of odds ratios: the multiplicative shift in the global NF odds ratio per 1-point higher game NS."
   ) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -2415,6 +2483,7 @@ bind_rows(
   ) |>
   style_tt(i = c(1, 5), bold = TRUE) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -2449,6 +2518,7 @@ summary(sens10_pooled) |>
     notes = "Odds ratios (binary outcome: any play in the subsequent 24 hours)."
   ) |>
   style_tt(fontsize = 0.7) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
@@ -2498,12 +2568,8 @@ s10_results |>
     notes = "All models include random intercepts, random slopes, and AR(1) autocorrelation. Estimates represent the difference in global need satisfaction when the specific domain was displaced vs. not displaced."
   ) |>
   style_tt(fontsize = 0.8) |>
+  style_tt(i = "notes", fontsize = 0.7) |>
   style_tt(i = 0, bold = TRUE)
 ```
 
 Results showed that global need satisfaction was lower when gaming displaced sleep/eating/fitness, but---contrary to expectations---tended to be higher when gaming displaced social engagements or caretaking.
-
-# References
-
-::: {#refs}
-:::

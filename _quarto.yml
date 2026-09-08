@@ -67,7 +67,9 @@ format:
     toc-location: right
     number-sections: true
     fontsize: 13pt
-    css: styles.css
+    # styles.css is declared on index.qmd only (it just holds the manuscript's
+    # .stat rule). Kept out of project config so editing it does not invalidate
+    # the five analysis-notebook tar_quarto() targets -- see WORKFLOW.md.
     code-fold: true
     code-summary: "Show code"
     code-tools: true

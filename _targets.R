@@ -22,6 +22,17 @@ export_targets <- function(names, report_name) {
   )
 }
 
+# --use-freezer: tar_quarto() renders one document at a time, and Quarto
+# *always* re-executes an incremental single-file render -- `freeze: auto`
+# only applies to whole-project renders. So without this flag, anything that
+# invalidates a report target (a styles.css / _quarto.yml / _extensions edit,
+# a deleted _site/*.html, an extra_files change) forces a full re-execution,
+# e.g. imputation.qmd's ~20-min MICE. `--use-freezer` makes the single-file
+# render restore computations from the committed _freeze/ instead, guarded by
+# a source-hash check (a genuine .qmd edit still re-executes). Requires that
+# _freeze/<doc>/ is committed and in sync with <doc>.qmd -- see WORKFLOW.md.
+QUARTO_ARGS <- "--use-freezer"
+
 list(
   # Data loading, telemetry processing, survey enrichment
   #
@@ -34,7 +45,8 @@ list(
   tar_quarto(
     preprocessing_report,
     path = "preprocessing.qmd",
-    extra_files = c("R/targets/telemetry.R", "R/targets/export.R")
+    extra_files = c("R/targets/telemetry.R", "R/targets/export.R"),
+    quarto_args = QUARTO_ARGS
   ),
   export_targets(preprocessing_export_names, "preprocessing_report"),
 
@@ -42,7 +54,8 @@ list(
   tar_quarto(
     imputation_report,
     path = "imputation.qmd",
-    extra_files = c("R/targets/imputation.R", "R/targets/derive.R", "R/targets/export.R")
+    extra_files = c("R/targets/imputation.R", "R/targets/derive.R", "R/targets/export.R"),
+    quarto_args = QUARTO_ARGS
   ),
   export_targets(imputation_export_names, "imputation_report"),
 
@@ -50,7 +63,8 @@ list(
   tar_quarto(
     modelling_report,
     path = "modelling.qmd",
-    extra_files = c("R/targets/models_main.R", "R/targets/export.R")
+    extra_files = c("R/targets/models_main.R", "R/targets/export.R"),
+    quarto_args = QUARTO_ARGS
   ),
   export_targets(modelling_export_names, "modelling_report"),
 
@@ -61,7 +75,8 @@ list(
   tar_quarto(
     sensitivity_report,
     path = "sensitivity.qmd",
-    extra_files = "R/targets/export.R"
+    extra_files = "R/targets/export.R",
+    quarto_args = QUARTO_ARGS
   ),
   export_targets(sensitivity_export_names, "sensitivity_report"),
 
@@ -70,7 +85,8 @@ list(
   tar_quarto(
     studyb_report,
     path = "studyb.qmd",
-    extra_files = "R/targets/export.R"
+    extra_files = "R/targets/export.R",
+    quarto_args = QUARTO_ARGS
   ),
   export_targets(studyb_export_names, "studyb_report"),
 
@@ -82,6 +98,7 @@ list(
   tar_quarto(
     manuscript_report,
     path = "index.qmd",
-    extra_files = c("R/helpers.R", "R/targets/imputation.R")
+    extra_files = c("R/helpers.R", "R/targets/imputation.R"),
+    quarto_args = QUARTO_ARGS
   )
 )

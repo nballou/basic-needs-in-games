@@ -158,6 +158,18 @@ pooled_coef <- function(pooled_obj, term_name, exponentiate = FALSE, accuracy = 
   scales::number(if (exponentiate) exp(est) else est, accuracy)
 }
 
+# Mark a pre-formatted result string as an inline statistical readout, so it
+# typesets distinctly from prose (monospace, muted) in every output format.
+# Emits a Pandoc span carrying a class (.stat, styled in styles.css for HTML
+# and mapped to the #stat function for Typst via the preprint extension's
+# `functions` key) and a custom-style (the "Statistic" character style in the
+# docx reference doc). `label` prepends a leading symbol:
+# stat(h1_day_est, "B") -> '[B = 0.21, SE = ...]{.stat custom-style="Statistic"}'.
+stat <- function(x, label = NULL) {
+  body <- if (is.null(label)) as.character(x) else glue("{label} = {x}")
+  glue('[{body}]{{.stat custom-style="Statistic"}}')
+}
+
 # Format the estimate and p-value for one coefficient from a pooled model,
 # e.g. "B = 0.21, p < .001" or (exponentiate = TRUE) "OR = 0.91, p = .016".
 report_estimate_p <- function(
