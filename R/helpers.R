@@ -259,10 +259,9 @@ report_wb_estimate <- function(
   stat_label = "t",
   exponentiate = FALSE
 ) {
-  # Helper to format p-values consistently
-
+  # p-value comparator phrase, to follow a bare "p": " < .001" or " = 0.016".
   format_p <- function(p) {
-    if (p < 0.001) "<.001" else as.character(round(p, 3))
+    if (p < 0.001) " < .001" else glue(" = {number(p, .001)}")
   }
 
   # Build the formatted result string for one coefficient row, on either the
@@ -276,13 +275,13 @@ report_wb_estimate <- function(
       glue(
         "{number(exp(row$estimate), accuracy)} ",
         "[95% CI: {number(exp(ci_low), accuracy)}, {number(exp(ci_high), accuracy)}], ",
-        "{stat_label} = {number(row$statistic, accuracy)}, p = {p_str}"
+        "{stat_label} = {number(row$statistic, accuracy)}, p{p_str}"
       )
     } else {
       glue(
         "{number(row$estimate, accuracy)}, SE = {number(row$std.error, accuracy)}, ",
         "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
-        "{stat_label} = {number(row$statistic, accuracy)}, p = {p_str}"
+        "{stat_label} = {number(row$statistic, accuracy)}, p{p_str}"
       )
     }
   }

@@ -66,7 +66,10 @@
   // Reset heading counter
   counter(heading).update(0)
 
-  doc
+  // Local change: label the whole appendix so the word count can exclude it
+  // (see the <wc-appendix> entry in the word-count exclude list below).
+  // Re-apply if this extension is updated.
+  [#doc <wc-appendix>]
 }
 
 #let preprint(
@@ -458,8 +461,11 @@
     })
   }
 
-  // Word count with wordometer package
-  show: word-count.with(exclude: (<refs>))
+  // Word count with wordometer package.
+  // Local change: also exclude <wc-appendix> so the reported count is the
+  // main-text length, not main text + appendix (index.qmd wraps its appendix
+  // in a ::: {#wc-appendix} div). Re-apply if this extension is updated.
+  show: word-count.with(exclude: (<refs>, <wc-appendix>))
 
   /* Document content */
   doc

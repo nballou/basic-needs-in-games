@@ -10,7 +10,7 @@
    stat() in R/helpers.R, set apart from the prose in a muted monospace. */
 .stat {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: #555;
 }
 
