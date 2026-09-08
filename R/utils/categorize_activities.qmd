@@ -16,12 +16,12 @@ This document classifies free-text activity descriptions into structured categor
 When rendering this document, Quarto buffers output. To see **real-time progress**, open a second terminal and run:
 
 ```bash
-tail -f R/categorize_activities/_log/classification_progress.log
+tail -f R/utils/categorize_activities_support/_log/classification_progress.log
 ```
 
 This will show live updates as activities are classified.
 
-All classification artifacts are organized in `R/categorize_activities/`:
+All classification artifacts are organized in `R/utils/categorize_activities_support/`:
 - `_cache/` - Quarto cache for expensive operations
 - `_files/` - Rendered output files
 - `_log/` - Real-time progress logs
@@ -46,7 +46,7 @@ library(here)
 TEST_SAMPLE_SIZE <- NULL # e.g., 100 for testing, NULL for production
 
 # Output directories
-SCRIPT_DIR <- here::here("R/categorize_activities")
+SCRIPT_DIR <- here::here("R/utils/categorize_activities_support")
 LOG_DIR <- file.path(SCRIPT_DIR, "_log")
 LOG_FILE <- file.path(LOG_DIR, "classification_progress.log")
 

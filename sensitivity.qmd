@@ -1,0 +1,1073 @@
+---
+title: "Sensitivity analyses (computation)"
+subtitle: "Fits the S1--S9 sensitivity models for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show code"
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+Fits every model behind the S1--S9 sensitivity analyses -- temporal-window
+variants, a Bayesian random-slopes model, a continuous-outcome model, the
+survey-completion-threshold sweep (S4), an interaction model, natural-spline
+models, per-component and need-frustration models, and per-domain
+displacement models. All run on the primary (full) sample except S2, which
+stays on the >=15-survey subsample (see that chunk). The complete-case and
+>=15-subsample H2 fits used by S4 come from `modelling.qmd`
+(`h2_cc_pooled`, `h2_restricted_pooled`). Each fit is cached under
+`data/models/`. The pooled results are read by the manuscript's appendix.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(glmmTMB)
+library(lme4)
+library(mice)
+library(brms)
+library(broom.mixed)
+library(splines)
+library(scales)
+library(janitor)
+library(targets)
+```
+
+```{r}
+#| label: setup
+#| code-summary: "Show code (Pipeline inputs)"
+
+source("R/targets/export.R")
+
+# Directory for the model-fit caches this document writes (see each chunk's
+# file.exists() guard). Created here so the pipeline survives it being cleared.
+dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+
+tar_load(c(
+  dat,
+  dat_restricted,
+  dat_restricted_complete,
+  m_imputations,
+  surveys,
+  activity_categories,
+  h2_pooled,
+  h2_restricted_pooled,
+  h2_cc_pooled
+))
+```
+
+## S1--S9 model fits
+```{r}
+#| label: s1-12h-model
+#| output: false
+#| code-summary: "Show code (S1: Fit models with 12-hour play window)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens1_cache_file <- "data/models/sens1_fits.rds"
+sens1_pooled_file <- "data/models/sens1_pooled.rds"
+
+if (file.exists(sens1_cache_file) && file.exists(sens1_pooled_file)) {
+  message("Loading cached S1 model fits")
+  sens1_fits <- readRDS(sens1_cache_file)
+  sens1_pooled <- readRDS(sens1_pooled_file)
+} else {
+  message("Fitting S1 models...")
+
+  sens1_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S1 model to imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_12h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  sens1_pooled <- pool(sens1_fits)
+
+  # Save to cache
+  saveRDS(sens1_fits, sens1_cache_file)
+  saveRDS(sens1_pooled, sens1_pooled_file)
+  message("S1 models saved to cache")
+}
+```
+```{r}
+#| label: s1b-6h-model
+#| output: false
+#| code-summary: "Show code (S1b: Fit models with 6-hour play window)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens1b_cache_file <- "data/models/sens1b_fits.rds"
+sens1b_pooled_file <- "data/models/sens1b_pooled.rds"
+
+if (file.exists(sens1b_cache_file) && file.exists(sens1b_pooled_file)) {
+  message("Loading cached S1b model fits")
+  sens1b_fits <- readRDS(sens1b_cache_file)
+  sens1b_pooled <- readRDS(sens1b_pooled_file)
+} else {
+  message("Fitting S1b models...")
+
+  sens1b_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S1b model to imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_6h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  sens1b_pooled <- pool(sens1b_fits)
+
+  # Save to cache
+  saveRDS(sens1b_fits, sens1b_cache_file)
+  saveRDS(sens1b_pooled, sens1b_pooled_file)
+  message("S1b models saved to cache")
+}
+```
+```{r}
+#| label: s1c-pre-model
+#| output: false
+#| code-summary: "Show code (S1c: Fit models with 24-hour pre-survey play window)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens1c_cache_file <- "data/models/sens1c_fits.rds"
+sens1c_pooled_file <- "data/models/sens1c_pooled.rds"
+
+if (file.exists(sens1c_cache_file) && file.exists(sens1c_pooled_file)) {
+  message("Loading cached S1c model fits")
+  sens1c_fits <- readRDS(sens1c_cache_file)
+  sens1c_pooled <- readRDS(sens1c_pooled_file)
+} else {
+  message("Fitting S1c models...")
+
+  sens1c_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S1c model to imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_24h_pre ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  sens1c_pooled <- pool(sens1c_fits)
+
+  # Save to cache
+  saveRDS(sens1c_fits, sens1c_cache_file)
+  saveRDS(sens1c_pooled, sens1c_pooled_file)
+  message("S1c models saved to cache")
+}
+```
+```{r}
+#| label: s2-brms-model
+#| output: false
+#| code-summary: "Show code (S2: Fit Bayesian model with random slopes)"
+
+# S2 probes the random-effects specification (the frequentist H2 could only
+# fit random intercepts), not sample construction. It is therefore the one
+# sensitivity analysis kept on the >=15-survey subsample: a full Bayesian
+# multiple-imputation refit with random slopes over participants who completed
+# a handful of surveys is disproportionate and prone to divergence.
+
+# File-based caching to avoid re-running across multiple output formats
+sens2_cache_file <- "data/models/sens2_fit.rds"
+
+if (file.exists(sens2_cache_file)) {
+  message("Loading cached S2 model fit")
+  sens2_fit <- readRDS(sens2_cache_file)
+} else {
+  message("Fitting S2 Bayesian model...")
+
+  # Complete cases from the >=15-survey subsample
+  dat_cc <- dat_restricted_complete |>
+    filter(
+      !is.na(global_ns),
+      !is.na(global_nf),
+      !is.na(game_ns),
+      !is.na(game_nf),
+      !is.na(telemetry_played_any_24h)
+    )
+
+  # Fit Bayesian model with random slopes
+  sens2_fit <- brm(
+    telemetry_played_any_24h ~
+      game_ns_cw +
+      game_ns_cb +
+      global_nf_cw +
+      global_nf_cb +
+      (1 + game_ns_cw + global_nf_cw | pid),
+    family = bernoulli(),
+    data = dat_cc,
+    chains = 4,
+    cores = 4,
+    iter = 5000,
+    warmup = 1000,
+    seed = 8675309
+  )
+
+  # Save to cache
+  saveRDS(sens2_fit, sens2_cache_file)
+  message("S2 model saved to cache")
+}
+```
+
+```{r}
+#| label: s2-bayes-extract
+#| output: false
+#| code-summary: "Show code (Extract Bayesian fixed effects for the S2 table)"
+
+s2_bayes_fixed <- summary(sens2_fit)$fixed |> as_tibble(rownames = "term")
+```
+
+```{r}
+#| label: s2-oneslope-models
+#| output: false
+#| code-summary: "Show code (S2: Fit H2 models with one random slope at a time)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens2_h2a_cache <- "data/models/sens2_h2a_fits.rds"
+sens2_h2a_pooled_cache <- "data/models/sens2_h2a_pooled.rds"
+sens2_h2b_cache <- "data/models/sens2_h2b_fits.rds"
+sens2_h2b_pooled_cache <- "data/models/sens2_h2b_pooled.rds"
+
+if (
+  file.exists(sens2_h2a_cache) &&
+    file.exists(sens2_h2a_pooled_cache) &&
+    file.exists(sens2_h2b_cache) &&
+    file.exists(sens2_h2b_pooled_cache)
+) {
+  message("Loading cached S2 one-slope model fits")
+  s2_h2a_fits <- readRDS(sens2_h2a_cache)
+  s2_h2a_pooled <- readRDS(sens2_h2a_pooled_cache)
+  s2_h2b_fits <- readRDS(sens2_h2b_cache)
+  s2_h2b_pooled <- readRDS(sens2_h2b_pooled_cache)
+} else {
+  message("Fitting S2 one-slope models...")
+
+  # H2a: Random slope for game_ns_cw only (>=15-survey subsample, as above)
+  message("Fitting S2 H2a models...")
+  s2_h2a_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S2 H2a model to imputation {i} of {m_imputations}"))
+    dat_i <- dat_restricted |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 + game_ns_cw | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  s2_h2a_pooled <- pool(s2_h2a_fits)
+
+  # H2b: Random slope for global_nf_cw only (>=15-survey subsample, as above)
+  message("Fitting S2 H2b models...")
+  s2_h2b_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S2 H2b model to imputation {i} of {m_imputations}"))
+    dat_i <- dat_restricted |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 + global_nf_cw | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  s2_h2b_pooled <- pool(s2_h2b_fits)
+
+  # Save to cache
+  saveRDS(s2_h2a_fits, sens2_h2a_cache)
+  saveRDS(s2_h2a_pooled, sens2_h2a_pooled_cache)
+  saveRDS(s2_h2b_fits, sens2_h2b_cache)
+  saveRDS(s2_h2b_pooled, sens2_h2b_pooled_cache)
+  message("S2 one-slope models saved to cache")
+}
+```
+```{r}
+#| label: s3-playvolume-model
+#| output: false
+#| code-summary: "Show code (S3: Fit models predicting continuous play volume)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens3_cache_file <- "data/models/sens3_fits.rds"
+sens3_pooled_file <- "data/models/sens3_pooled.rds"
+
+if (file.exists(sens3_cache_file) && file.exists(sens3_pooled_file)) {
+  message("Loading cached S3 model fits")
+  sens3_fits <- readRDS(sens3_cache_file)
+  sens3_pooled <- readRDS(sens3_pooled_file)
+} else {
+  message("Fitting S3 models...")
+
+  # Fit model to each imputed dataset
+  sens3_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S3 model to imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+    glmmTMB(
+      play_minutes_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = gaussian()
+    )
+  })
+
+  sens3_pooled <- pool(sens3_fits)
+
+  # Save to cache
+  saveRDS(sens3_fits, sens3_cache_file)
+  saveRDS(sens3_pooled, sens3_pooled_file)
+  message("S3 models saved to cache")
+}
+```
+```{r}
+#| label: threshold-imputations
+#| output: false
+#| code-summary: "Show code (S4: Run imputations across completion thresholds)"
+
+# Imputation function for threshold sensitivity analysis (S6)
+# Replicates primary imputation pipeline for a given min-waves cutoff
+# M=10 is sufficient for a robustness check; results cached per threshold
+run_threshold <- function(min_waves, m = 10) {
+  cache_file <- glue("data/models/threshold_{min_waves}_imp.csv.gz")
+
+  if (file.exists(cache_file)) {
+    message(glue("Loading threshold={min_waves} imputation from cache"))
+    return(read_csv(cache_file, show_col_types = FALSE) |> as.mids())
+  }
+
+  message(glue(
+    "Running imputation for threshold={min_waves} (M={m}), started {Sys.time()}"
+  ))
+
+  sw <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(
+      pid,
+      wave,
+      age,
+      gender,
+      edu_level,
+      employment,
+      marital_status,
+      wemwbs,
+      diaries_completed,
+      self_reported_weekly_play,
+      self_reported_played_24h,
+      displaced_core_domain,
+      bpnsfs_1,
+      bpnsfs_2,
+      bpnsfs_3,
+      bpnsfs_4,
+      bpnsfs_5,
+      bpnsfs_6,
+      bangs_1,
+      bangs_2,
+      bangs_3,
+      bangs_4,
+      bangs_5,
+      bangs_6
+    ) |>
+    pivot_wider(
+      id_cols = c(
+        pid,
+        age,
+        gender,
+        edu_level,
+        employment,
+        marital_status,
+        wemwbs,
+        diaries_completed,
+        self_reported_weekly_play
+      ),
+      names_from = wave,
+      values_from = c(
+        self_reported_played_24h,
+        displaced_core_domain,
+        bpnsfs_1,
+        bpnsfs_2,
+        bpnsfs_3,
+        bpnsfs_4,
+        bpnsfs_5,
+        bpnsfs_6,
+        bangs_1,
+        bangs_2,
+        bangs_3,
+        bangs_4,
+        bangs_5,
+        bangs_6
+      ),
+      names_sep = "_w"
+    )
+
+  played_vars_t <- grep("^self_reported_played_24h_w", names(sw), value = TRUE)
+  bpnsfs_vars_t <- grep("^bpnsfs_[1-6]_w", names(sw), value = TRUE)
+  bangs_vars_t <- grep("^bangs_[1-6]_w", names(sw), value = TRUE)
+  displaced_vars_t <- grep("^displaced_core_domain_w", names(sw), value = TRUE)
+
+  methods_t <- setNames(rep("", ncol(sw)), names(sw))
+  methods_t[played_vars_t] <- "logreg"
+  methods_t[c(bpnsfs_vars_t, bangs_vars_t, displaced_vars_t)] <- "pmm"
+  methods_t[c(
+    "pid",
+    "age",
+    "gender",
+    "edu_level",
+    "employment",
+    "marital_status",
+    "wemwbs",
+    "diaries_completed",
+    "self_reported_weekly_play"
+  )] <- ""
+
+  where_t <- is.na(sw)
+  for (bv in bangs_vars_t) {
+    wave_num <- str_extract(bv, "\\d+$")
+    pv <- paste0("self_reported_played_24h_w", wave_num)
+    if (pv %in% names(sw)) {
+      where_t[sw[[pv]] == "No" & is.na(sw[[bv]]), bv] <- FALSE
+    }
+  }
+
+  pred_t <- quickpred(
+    sw,
+    mincor = 0.3,
+    minpuc = 0.3,
+    include = c("age", "wemwbs", "self_reported_weekly_play"),
+    exclude = c(
+      "pid",
+      "gender",
+      "edu_level",
+      "employment",
+      "marital_status",
+      "diaries_completed"
+    )
+  )
+
+  imp_t <- futuremice(
+    data = sw,
+    m = m,
+    method = methods_t,
+    predictorMatrix = pred_t,
+    where = where_t,
+    maxit = 5,
+    n.core = parallel::detectCores() - 1,
+    parallelseed = 8675309
+  )
+
+  message(glue("Completed threshold={min_waves} imputation {Sys.time()}"))
+  imp_long_t <- complete(imp_t, action = "long", include = TRUE)
+  dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+  write_csv(imp_long_t, cache_file)
+  as.mids(imp_long_t)
+}
+
+threshold_values <- c(10, 12, 15, 18, 20, 24)
+threshold_imps <- map(threshold_values, run_threshold)
+names(threshold_imps) <- threshold_values
+```
+```{r}
+#| label: s4-threshold-models
+#| output: false
+#| code-summary: "Show code (S4: Fit H2 models across completion thresholds)"
+
+# Post-process each threshold's imputation: composites, centering, telemetry join
+process_threshold <- function(imp_t, min_waves) {
+  telemetry_t <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(
+      pid,
+      wave,
+      telemetry_played_any_24h,
+      play_minutes_24h,
+      telemetry_played_any_12h,
+      play_minutes_12h,
+      telemetry_played_any_6h,
+      play_minutes_6h,
+      telemetry_played_any_24h_pre,
+      play_minutes_24h_pre
+    )
+
+  complete(imp_t, action = "long", include = TRUE) |>
+    pivot_longer(
+      cols = -c(
+        .imp,
+        .id,
+        pid,
+        age,
+        gender,
+        edu_level,
+        employment,
+        marital_status,
+        wemwbs,
+        diaries_completed,
+        self_reported_weekly_play
+      ),
+      names_to = c(".value", "wave"),
+      names_pattern = "(.+)_w(.+)"
+    ) |>
+    mutate(wave = as.factor(wave)) |>
+    mutate(
+      global_ns = rowMeans(pick(bpnsfs_1, bpnsfs_3, bpnsfs_5), na.rm = TRUE),
+      global_nf = rowMeans(pick(bpnsfs_2, bpnsfs_4, bpnsfs_6), na.rm = TRUE),
+      game_ns = rowMeans(pick(bangs_1, bangs_3, bangs_5), na.rm = TRUE),
+      game_nf = rowMeans(pick(bangs_2, bangs_4, bangs_6), na.rm = TRUE)
+    ) |>
+    left_join(telemetry_t, by = c("pid", "wave")) |>
+    group_by(.imp, pid) |>
+    mutate(
+      global_ns_pm = mean(global_ns, na.rm = TRUE),
+      global_nf_pm = mean(global_nf, na.rm = TRUE),
+      game_ns_pm = mean(game_ns, na.rm = TRUE)
+    ) |>
+    ungroup() |>
+    group_by(.imp) |>
+    mutate(
+      global_ns_gm = mean(global_ns_pm, na.rm = TRUE),
+      global_nf_gm = mean(global_nf_pm, na.rm = TRUE),
+      game_ns_gm = mean(game_ns_pm, na.rm = TRUE),
+      global_ns_cw = global_ns - global_ns_pm,
+      global_nf_cw = global_nf - global_nf_pm,
+      game_ns_cw = game_ns - game_ns_pm,
+      global_ns_cb = global_ns_pm - global_ns_gm,
+      global_nf_cb = global_nf_pm - global_nf_gm,
+      game_ns_cb = game_ns_pm - game_ns_gm
+    ) |>
+    ungroup() |>
+    filter(.imp > 0)
+}
+
+# Fit the primary H2 model on each threshold's data and pool
+fit_h2_threshold <- function(dat_t, min_waves) {
+  cache_file <- glue("data/models/threshold_{min_waves}_h2_pooled.rds")
+
+  if (file.exists(cache_file)) {
+    message(glue("Loading threshold={min_waves} H2 pooled from cache"))
+    return(readRDS(cache_file))
+  }
+
+  m <- max(as.integer(dat_t$.imp))
+  fits <- lapply(1:m, function(i) {
+    glmmTMB(
+      telemetry_played_any_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = filter(dat_t, .imp == i),
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  pooled <- pool(fits)
+  saveRDS(pooled, cache_file)
+  pooled
+}
+
+threshold_results <- map2(
+  threshold_imps,
+  threshold_values,
+  function(imp_t, min_waves) {
+    dat_t <- process_threshold(imp_t, min_waves)
+    pooled_t <- fit_h2_threshold(dat_t, min_waves)
+
+    summary(pooled_t) |>
+      as_tibble() |>
+      filter(term %in% c("game_ns_cw", "global_nf_cw")) |>
+      mutate(
+        min_waves = min_waves,
+        lo = estimate - 1.96 * std.error,
+        hi = estimate + 1.96 * std.error,
+        coefficient = case_when(
+          term == "game_ns_cw" ~ "H2a: Game need satisfaction",
+          term == "global_nf_cw" ~ "H2b: Global need frustration"
+        )
+      )
+  }
+) |>
+  list_rbind()
+```
+```{r}
+#| label: s4-combined-results
+#| code-summary: "Show code (S4: Combine sample-robustness results into one set of estimates)"
+
+# Pull the two focal H2 coefficients from a pooled model, in a common format
+extract_h2_terms <- function(pooled) {
+  summary(pooled) |>
+    as_tibble() |>
+    filter(term %in% c("game_ns_cw", "global_nf_cw")) |>
+    mutate(
+      coefficient = case_when(
+        term == "game_ns_cw" ~ "H2a: Game need satisfaction",
+        term == "global_nf_cw" ~ "H2b: Global need frustration"
+      ),
+      lo = estimate - 1.96 * std.error,
+      hi = estimate + 1.96 * std.error
+    ) |>
+    select(
+      term,
+      coefficient,
+      estimate,
+      std.error,
+      statistic,
+      df,
+      p.value,
+      lo,
+      hi
+    )
+}
+
+spec_levels <- c(
+  "Complete cases",
+  "10",
+  "12",
+  ">=15 subsample",
+  "18",
+  "20",
+  "24",
+  "Full sample (primary)"
+)
+
+sample_results <- bind_rows(
+  # Complete-case and >=15-subsample H2 fits come from modelling.qmd (M=27),
+  # so they match what the main text reports; the threshold sweep is a lighter
+  # M=10 refit that only needs to show the estimate is flat across cutoffs.
+  extract_h2_terms(h2_cc_pooled) |> mutate(spec = "Complete cases"),
+  threshold_results |>
+    filter(min_waves != 15) |>
+    mutate(spec = as.character(min_waves)) |>
+    select(
+      term,
+      coefficient,
+      estimate,
+      std.error,
+      statistic,
+      df,
+      p.value,
+      lo,
+      hi,
+      spec
+    ),
+  extract_h2_terms(h2_restricted_pooled) |> mutate(spec = ">=15 subsample"),
+  extract_h2_terms(h2_pooled) |> mutate(spec = "Full sample (primary)")
+) |>
+  mutate(
+    spec = factor(spec, levels = spec_levels),
+    is_primary = spec == "Full sample (primary)"
+  )
+```
+```{r}
+#| label: s5-interaction-model
+#| output: false
+#| code-summary: "Show code (S5: Fit models with game NS × global NF interaction)"
+
+# File-based caching to avoid re-running across multiple output formats
+sens5b_cache_file <- "data/models/sens5b_fits.rds"
+sens5b_pooled_file <- "data/models/sens5b_pooled.rds"
+
+if (file.exists(sens5b_cache_file) && file.exists(sens5b_pooled_file)) {
+  message("Loading cached S5 model fits")
+  sens5b_fits <- readRDS(sens5b_cache_file)
+  sens5b_pooled <- readRDS(sens5b_pooled_file)
+} else {
+  message("Fitting S5 models...")
+
+  sens5b_fits <- lapply(1:m_imputations, function(i) {
+    message(glue("Fitting S5 model to imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+    glmmTMB(
+      telemetry_played_any_24h ~
+        game_ns_cw +
+        game_ns_cb +
+        global_nf_cw +
+        global_nf_cb +
+        game_ns_cw:global_nf_cw +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat_i,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  })
+
+  sens5b_pooled <- pool(sens5b_fits)
+
+  # Save to cache
+  saveRDS(sens5b_fits, sens5b_cache_file)
+  saveRDS(sens5b_pooled, sens5b_pooled_file)
+  message("S5 models saved to cache")
+}
+```
+```{r}
+#| label: s6-spline-model
+#| output: false
+#| code-summary: "Show code (S6: Fit H2 model with natural splines)"
+
+# First imputation only (the linear-vs-spline comparison is illustrative).
+# Created outside caching so it's available for plotting.
+dat_imp1 <- dat |>
+  filter(.imp == 1) |>
+  select(
+    pid,
+    wave,
+    date,
+    telemetry_played_any_24h,
+    game_ns_cw,
+    game_ns_cb,
+    global_nf_cw,
+    global_nf_cb
+  ) |>
+  filter(complete.cases(pick(everything())))
+
+# File-based caching
+sens8_linear_file <- "data/models/sens8_linear.rds"
+sens8_spline_file <- "data/models/sens8_spline.rds"
+
+if (file.exists(sens8_linear_file) && file.exists(sens8_spline_file)) {
+  message("Loading cached S6 models")
+  sens8_linear <- readRDS(sens8_linear_file)
+  sens8_spline <- readRDS(sens8_spline_file)
+} else {
+  message("Fitting S6 models (linear vs spline)...")
+
+  # Linear model (for comparison)
+  sens8_linear <- glmmTMB(
+    telemetry_played_any_24h ~
+      game_ns_cw +
+      game_ns_cb +
+      global_nf_cw +
+      global_nf_cb +
+      (1 | pid) +
+      ar1(factor(wave) + 0 | pid),
+    data = dat_imp1,
+    family = binomial(link = "logit")
+  )
+
+  # Spline model with natural splines (3 df) on within-person predictors
+  sens8_spline <- glmmTMB(
+    telemetry_played_any_24h ~
+      ns(game_ns_cw, df = 3) +
+      game_ns_cb +
+      ns(global_nf_cw, df = 3) +
+      global_nf_cb +
+      (1 | pid) +
+      ar1(factor(wave) + 0 | pid),
+    data = dat_imp1,
+    family = binomial(link = "logit")
+  )
+
+  # Cache results
+  dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+  saveRDS(sens8_linear, sens8_linear_file)
+  saveRDS(sens8_spline, sens8_spline_file)
+}
+```
+```{r}
+#| label: s7-components-prep
+#| code-summary: "Show code (Prepare data with separate needs components)"
+#| output: false
+
+# File-based caching to avoid re-running across multiple output formats
+sens9_cache_file <- "data/models/sens9_models.rds"
+
+if (file.exists(sens9_cache_file)) {
+  message("Loading cached S7 model fits")
+  sens9_cached <- readRDS(sens9_cache_file)
+  sens9_h2_aut <- sens9_cached$h2_aut
+  sens9_h2_com <- sens9_cached$h2_com
+  sens9_h2_rel <- sens9_cached$h2_rel
+} else {
+  message("Fitting S7 models...")
+
+  # Prepare component-level data for each imputation
+  sens9_data <- lapply(1:m_imputations, function(i) {
+    message(glue("Preparing S7 data for imputation {i} of {m_imputations}"))
+    dat_i <- dat |> filter(.imp == i)
+
+    # Calculate person means for each component (game and global)
+    dat_i <- dat_i |>
+      group_by(pid) |>
+      mutate(
+        # Game needs
+        game_aut_pm = mean(bangs_1, na.rm = TRUE),
+        game_com_pm = mean(bangs_3, na.rm = TRUE),
+        game_rel_pm = mean(bangs_5, na.rm = TRUE),
+        # Global need frustration
+        global_aut_nf_pm = mean(bpnsfs_2, na.rm = TRUE),
+        global_com_nf_pm = mean(bpnsfs_4, na.rm = TRUE),
+        global_rel_nf_pm = mean(bpnsfs_6, na.rm = TRUE)
+      ) |>
+      ungroup() |>
+      # Calculate grand means
+      mutate(
+        # Game needs
+        game_aut_gm = mean(game_aut_pm, na.rm = TRUE),
+        game_com_gm = mean(game_com_pm, na.rm = TRUE),
+        game_rel_gm = mean(game_rel_pm, na.rm = TRUE),
+        # Global need frustration
+        global_aut_nf_gm = mean(global_aut_nf_pm, na.rm = TRUE),
+        global_com_nf_gm = mean(global_com_nf_pm, na.rm = TRUE),
+        global_rel_nf_gm = mean(global_rel_nf_pm, na.rm = TRUE)
+      ) |>
+      # Within/between centering
+      mutate(
+        # Game needs
+        game_aut_cw = bangs_1 - game_aut_pm,
+        game_aut_cb = game_aut_pm - game_aut_gm,
+        game_com_cw = bangs_3 - game_com_pm,
+        game_com_cb = game_com_pm - game_com_gm,
+        game_rel_cw = bangs_5 - game_rel_pm,
+        game_rel_cb = game_rel_pm - game_rel_gm,
+        # Global need frustration
+        global_aut_nf_cw = bpnsfs_2 - global_aut_nf_pm,
+        global_aut_nf_cb = global_aut_nf_pm - global_aut_nf_gm,
+        global_com_nf_cw = bpnsfs_4 - global_com_nf_pm,
+        global_com_nf_cb = global_com_nf_pm - global_com_nf_gm,
+        global_rel_nf_cw = bpnsfs_6 - global_rel_nf_pm,
+        global_rel_nf_cb = global_rel_nf_pm - global_rel_nf_gm
+      )
+
+    return(dat_i)
+  })
+
+  # H2 models: game component + matching global NF component → play
+  message("Fitting S7 H2 autonomy models...")
+  sens9_h2_aut <- pool(lapply(sens9_data, function(dat) {
+    glmmTMB(
+      telemetry_played_any_24h ~ game_aut_cw +
+        global_aut_nf_cw +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  }))
+
+  message("Fitting S7 H2 competence models...")
+  sens9_h2_com <- pool(lapply(sens9_data, function(dat) {
+    glmmTMB(
+      telemetry_played_any_24h ~ game_com_cw +
+        global_com_nf_cw +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  }))
+
+  message("Fitting S7 H2 relatedness models...")
+  sens9_h2_rel <- pool(lapply(sens9_data, function(dat) {
+    glmmTMB(
+      telemetry_played_any_24h ~ game_rel_cw +
+        global_rel_nf_cw +
+        (1 | pid) +
+        ar1(wave + 0 | pid),
+      data = dat,
+      family = binomial(link = "logit"),
+      ziformula = ~0
+    )
+  }))
+
+  # Save to cache
+  saveRDS(
+    list(
+      h2_aut = sens9_h2_aut,
+      h2_com = sens9_h2_com,
+      h2_rel = sens9_h2_rel
+    ),
+    sens9_cache_file
+  )
+  message("S7 models saved to cache")
+}
+```
+```{r}
+#| label: s8-game-nf-model
+#| output: false
+#| code-summary: "Show code (S8: Fit model with game NF predicting play)"
+
+# File-based caching
+sens10_cache_file <- "data/models/sens10_fits.rds"
+sens10_pooled_file <- "data/models/sens10_pooled.rds"
+
+if (file.exists(sens10_pooled_file)) {
+  message("Loading cached S8 pooled results")
+  sens10_pooled <- readRDS(sens10_pooled_file)
+} else {
+  message("Fitting S8 models...")
+
+  # Prepare data with game_nf centered
+  sens10_data <- lapply(1:m_imputations, function(i) {
+    dat_i <- dat |> filter(.imp == i)
+
+    dat_i |>
+      group_by(pid) |>
+      mutate(
+        game_nf_pm = mean(game_nf, na.rm = TRUE)
+      ) |>
+      ungroup() |>
+      mutate(
+        game_nf_gm = mean(game_nf_pm, na.rm = TRUE),
+        game_nf_cw = game_nf - game_nf_pm,
+        game_nf_cb = game_nf_pm - game_nf_gm
+      )
+  })
+
+  # Fit models
+  sens10_fits <- lapply(sens10_data, function(dat_i) {
+    glmmTMB::glmmTMB(
+      telemetry_played_any_24h ~
+        game_nf_cw +
+        game_nf_cb +
+        (1 | pid),
+      family = binomial(link = "logit"),
+      data = dat_i,
+      control = glmmTMBControl(
+        optimizer = optim,
+        optArgs = list(method = "BFGS")
+      )
+    )
+  })
+
+  # Pool results
+  sens10_pooled <- pool(sens10_fits)
+
+  # Save to cache
+  saveRDS(sens10_fits, sens10_cache_file)
+  saveRDS(sens10_pooled, sens10_pooled_file)
+  message("S8 models saved to cache")
+}
+```
+```{r}
+#| label: s9-h3-by-domain-prep
+#| code-summary: "Show code (S9: Prepare domain-specific displacement indicators)"
+
+# Create domain-specific displacement indicators
+dat_domains <- dat |>
+  left_join(
+    activity_categories |> select(pid, wave, activity_label),
+    by = c("pid", "wave")
+  ) |>
+  mutate(
+    displaced_work_school = activity_label == "work_school",
+    displaced_social = activity_label == "social_engagement",
+    displaced_health_sleep = activity_label == "sleep_eat_fitness",
+    displaced_caretaking = activity_label == "caretaking"
+  )
+```
+```{r}
+#| label: s9-h3-by-domain-models
+#| output: false
+#| code-summary: "Show code (S9: Fit H3 models for each core life domain)"
+
+# File-based caching
+s10_cache_file <- "data/models/s11_fits.rds"
+s10_pooled_file <- "data/models/s11_pooled.rds"
+
+if (file.exists(s10_cache_file) && file.exists(s10_pooled_file)) {
+  message("Loading cached S9 model fits")
+  s10_fits <- readRDS(s10_cache_file)
+  s10_pooled <- readRDS(s10_pooled_file)
+} else {
+  message("Fitting S9 models...")
+
+  # Fit separate model for each domain
+  domains <- c(
+    "displaced_work_school",
+    "displaced_social",
+    "displaced_health_sleep",
+    "displaced_caretaking"
+  )
+
+  s10_fits <- list()
+  s10_pooled <- list()
+
+  for (domain in domains) {
+    message(glue("Fitting model for {domain}"))
+
+    # Filter to only observations where this specific domain could be displaced
+    # (i.e., where the activity_label indicates this domain or other)
+    domain_fits <- lapply(1:m_imputations, function(i) {
+      dat_i <- dat_domains |>
+        filter(.imp == i, !is.na(!!sym(domain)))
+
+      glmmTMB(
+        as.formula(glue(
+          "global_ns ~ {domain} + (1 + {domain} | pid) + ar1(wave + 0 | pid)"
+        )),
+        data = dat_i
+      )
+    })
+
+    s10_fits[[domain]] <- domain_fits
+    s10_pooled[[domain]] <- pool(domain_fits)
+  }
+
+  # Save to cache
+  dir.create("data/models", showWarnings = FALSE, recursive = TRUE)
+  saveRDS(s10_fits, s10_cache_file)
+  saveRDS(s10_pooled, s10_pooled_file)
+  message("S9 models saved to cache")
+}
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export pooled results for the manuscript appendix)"
+
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  sensitivity_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(sensitivity_export_names)} objects to data/exports/"))
+```

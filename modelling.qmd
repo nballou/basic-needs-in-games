@@ -1,0 +1,333 @@
+---
+title: "Modelling"
+subtitle: "Primary hypothesis tests for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+Fits the three primary hypothesis tests (H1-H3) for Study A with `glmmTMB`,
+each fit separately to all 27 imputed datasets and pooled by Rubin's rules,
+and reports convergence checks and residual diagnostics. Each hypothesis is
+fit three ways: on the primary (full) sample -- the headline result -- and,
+as sensitivity analyses reported alongside it, on the >=15-survey subsample
+and on complete cases with no imputation. Study B models are in the Study B
+document; the S1-S9 sensitivity analyses are in the sensitivity document.
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(glmmTMB)
+library(mice)
+library(broom.mixed)
+library(DHARMa)
+library(future)
+library(furrr)
+library(targets)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/models_main.R")
+```
+
+```{r}
+#| label: load-inputs
+#| code-summary: "Show code (Load imputation.qmd's exported objects)"
+
+tar_load(c(dat, dat_restricted, dat_complete, m_imputations))
+```
+
+```{r}
+#| label: formulas
+#| code-summary: "Show code (Hypothesis model formulas)"
+
+# One formula per hypothesis, reused across the primary, >=15-subsample, and
+# complete-case fits. H1 and H3 are linear with a random slope for the focal
+# day-level predictor; H2 is logistic with random intercepts only (random
+# slopes did not converge for the binary outcome). All include AR(1).
+h1_formula <- global_ns ~
+  game_ns_cw + game_ns_cb + (1 + game_ns_cw | pid) + ar1(wave + 0 | pid)
+
+h2_formula <- telemetry_played_any_24h ~
+  game_ns_cw + game_ns_cb + global_nf_cw + global_nf_cb +
+  (1 | pid) + ar1(wave + 0 | pid)
+
+h3_formula <- global_ns ~
+  displaced_core_domain + (1 + displaced_core_domain | pid) + ar1(wave + 0 | pid)
+```
+
+## Primary Hypothesis Models
+
+Each model is fit separately to all `r m_imputations` imputed datasets
+(parallelized via `fit_mi_models()`) and pooled using Rubin's rules. The
+`*_restricted_pooled` fits repeat this on the >=15-survey subsample; the
+`*_cc_pooled` fits use complete cases only (`fit_cc_model()`).
+
+### H1: Game need satisfaction -> global need satisfaction
+
+```{r}
+#| label: h1-model
+#| code-summary: "Show code (Fit H1 models: game NS -> global NS)"
+
+h1_fits <- fit_mi_models(dat, h1_formula, m = m_imputations)
+h1_pooled <- pool(h1_fits)
+h1mod <- h1_fits[[1]]
+
+h1_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted, h1_formula, m = m_imputations
+))
+h1_cc_pooled <- fit_cc_model(
+  dat_complete, h1_formula, key_vars = c("global_ns", "game_ns")
+)
+```
+
+### H2: Game need satisfaction + global need frustration -> play
+
+```{r}
+#| label: h2-model
+#| code-summary: "Show code (Fit H2 models: game NS + global NF -> play)"
+
+h2_fits <- fit_mi_models(
+  dat,
+  h2_formula,
+  m = m_imputations,
+  family = binomial(link = "logit"),
+  ziformula = ~0
+)
+h2_pooled <- pool(h2_fits)
+h2mod <- h2_fits[[1]]
+
+h2_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted,
+  h2_formula,
+  m = m_imputations,
+  family = binomial(link = "logit"),
+  ziformula = ~0
+))
+h2_cc_pooled <- fit_cc_model(
+  dat_complete,
+  h2_formula,
+  key_vars = c("telemetry_played_any_24h", "game_ns", "global_nf"),
+  family = binomial(link = "logit"),
+  ziformula = ~0
+)
+```
+
+### H3: Displaced core domain -> global need satisfaction
+
+```{r}
+#| label: h3-model
+#| code-summary: "Show code (Fit H3 models: displaced core domain -> global NS)"
+
+h3_fits <- fit_mi_models(dat, h3_formula, m = m_imputations)
+h3_pooled <- pool(h3_fits)
+h3mod <- h3_fits[[1]]
+
+h3_restricted_pooled <- pool(fit_mi_models(
+  dat_restricted, h3_formula, m = m_imputations
+))
+h3_cc_pooled <- fit_cc_model(
+  dat_complete, h3_formula, key_vars = c("global_ns", "displaced_core_domain")
+)
+```
+
+### Convergence and singularity across primary fits
+
+The primary sample includes participants with very few completed surveys, so
+the H1/H3 random slopes may be estimated as singular for some imputations.
+This tallies convergence codes and near-zero random-slope SDs across the 27
+primary fits; if many fits are singular the random slope should be dropped
+(as it already is for H2) and that documented as a deviation.
+
+```{r}
+#| label: primary-convergence
+#| code-summary: "Show code (Convergence + singularity tally, primary fits)"
+
+slope_sd <- function(fit) {
+  vc <- glmmTMB::VarCorr(fit)$cond$pid
+  sd <- attr(vc, "stddev")
+  if (length(sd) > 1) sd[2] else NA_real_
+}
+
+tibble(
+  hypothesis = c("H1", "H2", "H3"),
+  fits = list(h1_fits, h2_fits, h3_fits)
+) |>
+  mutate(
+    converged = map_int(fits, ~ sum(map_lgl(.x, \(f) f$fit$convergence == 0))),
+    min_slope_sd = map_dbl(fits, ~ min(map_dbl(.x, slope_sd), na.rm = TRUE)),
+    n_singular_slope = map_int(
+      fits,
+      ~ sum(map_dbl(.x, slope_sd) < 1e-4, na.rm = TRUE)
+    )
+  ) |>
+  select(-fits) |>
+  print()
+```
+
+## Model Diagnostics
+
+Convergence across imputations, random-effect structure, and (for the binary
+H2 outcome) DHARMa residual checks. These operate on the per-imputation fit
+lists (`h1_fits` / `h2_fits`), which are not exported -- so they live here in
+the modelling stage rather than in the manuscript. None of these quantities
+are cited in the manuscript text.
+
+```{r}
+#| label: h1-diagnostics
+#| code-summary: "Show code (H1 convergence and random-effect structure)"
+
+# Convergence check across imputations
+conv_summary <- tibble(
+  imputation = seq_along(h1_fits),
+  converged = map_lgl(h1_fits, ~ .x$fit$convergence == 0),
+  warnings = map_chr(
+    h1_fits,
+    ~ {
+      w <- .x$fit$warnings
+      if (length(w) > 0) paste(w, collapse = "; ") else "None"
+    }
+  )
+)
+print(conv_summary)
+glue("Converged: {sum(conv_summary$converged)}/{nrow(conv_summary)}")
+
+# Random effect structure (from the first imputation's model)
+re_sd <- attr(VarCorr(h1mod)$cond$pid, "stddev")
+glue("Random intercept SD: {round(re_sd[1], 3)}")
+if (length(re_sd) > 1) {
+  glue("Random slope SD (game_ns_cw): {round(re_sd[2], 3)}")
+}
+```
+
+```{r}
+#| label: h2-diagnostics
+#| code-summary: "Show code (H2 convergence, random effects, DHARMa residuals)"
+#| fig-width: 8
+
+# Convergence check across imputations
+conv_summary <- tibble(
+  imputation = seq_along(h2_fits),
+  converged = map_lgl(h2_fits, ~ .x$fit$convergence == 0),
+  warnings = map_chr(
+    h2_fits,
+    ~ {
+      w <- .x$fit$warnings
+      if (length(w) > 0) paste(w, collapse = "; ") else "None"
+    }
+  )
+)
+print(conv_summary)
+glue("Converged: {sum(conv_summary$converged)}/{nrow(conv_summary)}")
+
+# Random effect structure (first imputation's model)
+re_sd <- attr(VarCorr(h2mod)$cond$pid, "stddev")
+re_names <- names(re_sd)
+walk2(re_names, re_sd, ~ glue("{.x} SD: {round(.y, 3)}"))
+
+# Random intercept distribution (logit scale)
+re_intercepts <- coef(h2mod)$cond$pid[, "(Intercept)"]
+tibble(
+  stat = c("Mean", "SD", "Min", "Max", "IQR_25%", "IQR_75%"),
+  value = c(
+    mean(re_intercepts),
+    sd(re_intercepts),
+    min(re_intercepts),
+    max(re_intercepts),
+    quantile(re_intercepts, 0.25),
+    quantile(re_intercepts, 0.75)
+  )
+) |>
+  mutate(value = round(value, 3)) |>
+  print()
+
+# Implied probability at fixed intercept
+fixed_int <- fixef(h2mod)$cond["(Intercept)"]
+glue("Pr(play) at population mean: {round(plogis(fixed_int), 3)}")
+
+# DHARMa residual diagnostics
+sim_resid <- simulateResiduals(h2mod, plot = FALSE)
+plot(sim_resid, main = "H2 Model: DHARMa diagnostics")
+
+list(
+  dispersion = testDispersion(sim_resid),
+  outliers = testOutliers(sim_resid),
+  quantiles = testQuantiles(sim_resid)
+) |>
+  walk(print)
+
+# Residuals vs. predictors
+par(mfrow = c(2, 2))
+walk2(
+  c("game_ns_cw", "global_nf_cw", "game_ns_cb", "global_nf_cb"),
+  c(
+    "Game NS (within)",
+    "Global NF (within)",
+    "Game NS (between)",
+    "Global NF (between)"
+  ),
+  ~ plotResiduals(sim_resid, form = h2mod$frame[[.x]], main = glue("vs. {.y}"))
+)
+par(mfrow = c(1, 1))
+
+# Temporal autocorrelation (within-person lag-1)
+acf_by_person <- h2mod$frame |>
+  group_by(pid) |>
+  arrange(wave) |>
+  filter(n() >= 3) |>
+  reframe(
+    acf = cor(
+      sim_resid$scaledResiduals[cur_group_rows()][-n()],
+      sim_resid$scaledResiduals[cur_group_rows()][-1],
+      use = "complete.obs"
+    )
+  ) |>
+  pull(acf)
+
+tibble(
+  stat = c("Mean", "Median", "Min", "Max"),
+  lag1_acf = c(
+    mean(acf_by_person),
+    median(acf_by_person),
+    min(acf_by_person),
+    max(acf_by_person)
+  )
+) |>
+  mutate(lag1_acf = round(lag1_acf, 3)) |>
+  print()
+
+# Aggregated residuals
+recalculateResiduals(sim_resid, group = h2mod$frame$wave) |>
+  plot(main = "Residuals by wave")
+recalculateResiduals(sim_resid, group = h2mod$frame$pid) |>
+  plot(main = "Residuals by individual")
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for the manuscript and supplement)"
+
+source("R/targets/export.R")
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  modelling_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(modelling_export_names)} objects to data/exports/"))
+```

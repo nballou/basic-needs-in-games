@@ -1,0 +1,139 @@
+---
+title: "Multiple Imputation"
+subtitle: "MICE imputation and within/between-person centering for 'All BANG, little buck'"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: false
+knitr:
+  opts_chunk:
+    warning: false
+    message: false
+---
+
+Runs multiple imputation by chained equations (MICE, M = 27) on the survey
+data, then derives the analysis datasets: composite need-satisfaction and
+need-frustration scores from the imputed items, joined to the telemetry play
+measures, with within- and between-person centered predictors.
+
+Two imputations are run with identical settings. The **primary** imputation
+covers all eligible participants (>=1 completed daily survey -- the
+preregistered imputation target). The **restricted** imputation covers the
+>=15-survey (>=50%) subsample, and is used only for the sample-construction
+sensitivity analysis (S4) and the Bayesian random-slopes check (S2).
+
+```{r}
+#| label: libraries
+#| code-summary: "Show code (Load required packages)"
+
+library(tidyverse)
+library(glue)
+library(mice)
+library(scales)
+library(targets)
+```
+
+```{r}
+#| label: source-functions
+#| code-summary: "Show code (Load pipeline functions)"
+
+source("R/targets/imputation.R")
+source("R/targets/derive.R")
+```
+
+```{r}
+#| label: load-inputs
+#| code-summary: "Show code (Load preprocessing.qmd's exported objects)"
+
+tar_load(surveys)
+```
+
+## Multiple Imputation
+
+`mice` is run with predictive mean matching for continuous items and logistic
+regression for the binary self-reported-play item. BANGS (in-game need) items
+are only imputed for days when the person reported playing (or play status is
+unknown) -- they aren't "missing" on non-play days, the question wasn't
+applicable.
+
+```{r}
+#| label: mice
+#| code-summary: "Show code (Run MICE on the primary and restricted samples)"
+#| results: hide
+
+M_IMPUTATIONS <- 27
+m_imputations <- M_IMPUTATIONS
+
+# Telemetry columns joined to the imputed survey data. Passively logged, so
+# never imputed; filtered per-sample to match each imputation's participants.
+telemetry_cols <- c(
+  "pid", "wave", "date",
+  "telemetry_played_any_24h", "play_minutes_24h",
+  "telemetry_played_any_12h", "play_minutes_12h",
+  "telemetry_played_any_6h", "play_minutes_6h",
+  "telemetry_played_any_24h_pre", "play_minutes_24h_pre"
+)
+
+# Impute one survey-completion sample: pivot wide, run MICE, and derive the
+# long analysis frame (item composites + within/between-person centering).
+# min_waves = 0 keeps every participant with at least one completed survey.
+impute_sample <- function(min_waves) {
+  n_pids <- n_distinct(surveys$pid[surveys$diaries_completed >= min_waves])
+  message(glue(
+    "MICE (min_waves={min_waves}): {n_pids} participants, M={M_IMPUTATIONS}, started {Sys.time()}"
+  ))
+  telemetry_vars <- surveys |>
+    filter(diaries_completed >= min_waves) |>
+    select(all_of(telemetry_cols))
+  surveys_wide <- build_wide_survey(surveys, min_waves = min_waves)
+  imp <- run_mice(surveys_wide, m = M_IMPUTATIONS, maxit = 5, seed = 8675309)
+  message(glue(
+    "  completed {Sys.time()} ({nrow(imp$loggedEvents)} logged events)"
+  ))
+  derive_analysis_dat(imp, telemetry_vars)
+}
+
+daily_primary <- impute_sample(min_waves = 0)
+daily_restricted <- impute_sample(min_waves = 15)
+```
+
+Split each imputation into the analysis datasets (`.imp > 0`) and the
+non-imputed slice (`.imp == 0`, used for the observed-vs-imputed diagnostic
+and complete-case analyses):
+
+```{r}
+#| label: post-imputation-centering
+#| code-summary: "Show code (Split imputed and non-imputed frames)"
+
+# Primary sample: all eligible participants (preregistered imputation target).
+dat <- daily_primary |> filter(.imp > 0)
+dat_desc <- dat |> filter(.imp == 1)
+dat_complete <- daily_primary |> filter(.imp == 0)
+
+# Restricted sample: >=15-survey subsample, for S4 and S2 only.
+dat_restricted <- daily_restricted |> filter(.imp > 0)
+dat_restricted_complete <- daily_restricted |> filter(.imp == 0)
+
+message(glue(
+  "Primary: {n_distinct(dat$pid)} participants, {nrow(dat) / m_imputations} rows/imputation. ",
+  "Restricted: {n_distinct(dat_restricted$pid)} participants."
+))
+```
+
+## Exported Objects
+
+```{r}
+#| label: export
+#| code-summary: "Show code (Export objects for modelling, sensitivity, and the manuscript)"
+
+source("R/targets/export.R")
+dir.create("data/exports", showWarnings = FALSE, recursive = TRUE)
+walk(
+  imputation_export_names,
+  ~ saveRDS(get(.x), file.path("data/exports", paste0(.x, ".rds")))
+)
+message(glue("Exported {length(imputation_export_names)} objects to data/exports/"))
+```

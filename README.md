@@ -12,11 +12,17 @@ The best starting point for understanding this analysis is to view the rendered 
 
 Key elements of the repo are:
 
-- `index.qmd`, which generates the full manuscript including methods, results, and sensitivity analyses
-- `R/plot_marginal_effects.R`, custom plotting function for visualizing model predictions
-- `R/categorize_activities.qmd`, script for classifying displaced activities into core life domains
-- `R/determine_m_imputations.qmd`, script for determining the number of imputations needed based on fraction of missing information
-- `data/models/`, cached model fits to speed up rendering
+- `_targets.R`, the analysis pipeline: `preprocessing.qmd` → `imputation.qmd`
+  → `modelling.qmd` (Study A), `studyb.qmd` (Study B), all feeding
+  `index.qmd` (the manuscript / site home page) and `supplement.qmd`
+  (appendix + sensitivity analyses). Run `targets::tar_make()` to build
+  everything in order.
+- `R/targets/`, the functions the pipeline stages share
+- `R/helpers.R`, presentation constants and reporting helpers for the
+  manuscript and supplement
+- `R/utils/categorize_activities.qmd`, script for classifying displaced activities into core life domains
+- `R/utils/determine_m_imputations.qmd`, script for determining the number of imputations needed based on fraction of missing information
+- `data/models/`, cached sensitivity-analysis model fits to speed up rendering
 - `references.bib`, bibliography for the manuscript
 - `renv.lock`, package versions used in the analysis
 

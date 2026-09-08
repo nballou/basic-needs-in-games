@@ -4,11 +4,88 @@ project:
   output-dir: _site
   render:
     - index.qmd
+    - preprocessing.qmd
+    - imputation.qmd
+    - modelling.qmd
+    - studyb.qmd
+    - sensitivity.qmd
   preview:
     watch-inputs: true
 
 execute:
   freeze: auto
+
+# Relabel cross-referenced `note` callouts as "Box" in HTML, matching the
+# preprint extension's Typst treatment (see _extensions/mvuorre/preprint/
+# typst-callouts.typ). Applies to the "Box N:" title and to @nte- references.
+language:
+  crossref-nte-title: "Box"
+  crossref-nte-prefix: "Box"
+  callout-note-title: "Box"
+
+website:
+  title: "All BANG, little buck"
+  navbar:
+    background: light
+    right:
+      - icon: github
+        href: https://github.com/nballou/basic-needs-in-games
+        aria-label: GitHub
+  sidebar:
+    style: docked
+    contents:
+      - text: "Manuscript & appendix"
+        href: index.qmd
+      - section: "Analysis pipeline"
+        contents:
+          - text: "Preprocessing"
+            href: preprocessing.qmd
+          - text: "Multiple imputation"
+            href: imputation.qmd
+          - text: "Modelling (H1–H3)"
+            href: modelling.qmd
+          - text: "Sensitivity (S1–S9)"
+            href: sensitivity.qmd
+          - text: "Study B (PowerWash)"
+            href: studyb.qmd
+  repo-url: https://github.com/nballou/basic-needs-in-games
+  repo-actions: [source, issue]
+  page-navigation: true
+
+# Site-wide HTML look. Individual documents (e.g. the manuscript's author
+# block, the supplement's bibliography) override or extend these keys locally;
+# everything not set at the document level is inherited from here.
+# theme: any Bootswatch name -- cosmo, flatly, litera, zephyr, lux, sandstone,
+# journal, minty, morph, pulse, simplex, sketchy, spacelab, yeti ...
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    number-sections: true
+    fontsize: 13pt
+    # styles.css is declared on index.qmd only (it just holds the manuscript's
+    # .stat rule). Kept out of project config so editing it does not invalidate
+    # the five analysis-notebook tar_quarto() targets -- see WORKFLOW.md.
+    code-fold: true
+    code-summary: "Show code"
+    code-tools: true
+    code-links: repo
+    embed-resources: false
+    page-layout: article
+    grid:
+      body-width: 900px
+      margin-width: 250px
+    other-links:
+      - text: Stage 1 Registered Report
+        href: https://osf.io/pb5nu
+        icon: file-pdf
+      - text: Data (Zenodo)
+        href: https://doi.org/10.5281/zenodo.18352505
+        icon: link
 
 repo-url: https://github.com/nballou/basic-needs-in-games
 site-url: https://nballou.github.io/basic-needs-in-games/

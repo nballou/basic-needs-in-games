@@ -8,15 +8,28 @@
 ^~$*
 /.quarto/
 /_site/
+pci/
 
 # Ignore large downloadable datasets
 /data/open-play*/
 /data/open-play*
 /data/pws/
+/data/cache/
 ms.qmd
+
+# Stray render byproducts (quarto drops these next to a directly-rendered doc)
+/*.html
+*.rmarkdown
 
 # Ignore cached model fits (reproducible but slow)
 /data/models/
+/data/imputation_analytical.csv.gz
+/data/imputation_full.csv.gz
+/data/exports/
+
+# targets pipeline store (regenerated via tar_make())
+/_targets/
+/_targets_r/
 
 .lintr
 settings.json
@@ -73,3 +86,6 @@ rsconnect/
 
 **/*.quarto_ipynb
 FORMATTING_GUIDE.md
+WORKFLOW.md
+PLAN-manuscript-split.md
+CLAUDE.md

@@ -1,3 +1,56 @@
+# Shared presentation constants for manuscript.qmd / supplement.qmd (and the
+# Study B / diagnostics figures). Colour palette and human-readable labels for
+# the snake_case model terms.
+
+colors <- list(
+  game_ns = "#009988", # Teal for game need satisfaction
+  global_ns = "#44BB99", # Light teal for global need satisfaction
+  global_nf = "#EE6677", # Red for global need frustration
+  nintendo = "#E60012", # Nintendo red
+  xbox = "#107C10", # Xbox green
+  steam = "#215e8a", # Steam dark blue
+  within = "#228833", # Green for within-person variance
+  between = "#BBBBBB" # Gray for between-person variance
+)
+
+labels <- c(
+  # Base variables
+  "game_ns" = "Game need satisfaction",
+  "game_nf" = "Game need frustration",
+  "global_ns" = "Global need satisfaction",
+  "global_nf" = "Global need frustration",
+  "session_length" = "Session length",
+  "session_gap" = "Time to next session",
+  # Within-person
+  "game_ns_cw" = "Game need satisfaction (within)",
+  "game_nf_cw" = "Game need frustration (within)",
+  "global_ns_cw" = "Global need satisfaction (within)",
+  "global_nf_cw" = "Global need frustration (within)",
+  # Between-person
+  "game_ns_cb" = "Game need satisfaction (between)",
+  "game_nf_cb" = "Game need frustration (between)",
+  "global_ns_cb" = "Global need satisfaction (between)",
+  "global_nf_cb" = "Global need frustration (between)",
+  # Within-person (alternate)
+  "game_ns (within-person)" = "Game need satisfaction (within-person)",
+  "global_ns (within-person)" = "Global need satisfaction (within-person)",
+  "global_nf (within-person)" = "Global need frustration (within-person)",
+  # Between-person (alternate)
+  "game_ns (between-person)" = "Game need satisfaction (between-person)",
+  "global_ns (between-person)" = "Global need satisfaction (between-person)",
+  "global_nf (between-person)" = "Global need frustration (between-person)",
+  # Interaction
+  "game_ns_cw:global_nf_cw" = "Game need satisfaction × Global need frustration (within)",
+  # Displacement
+  "displaced_core_domain" = "Displaced core domain",
+  "displaced_core_domainTRUE" = "Displaced core domain",
+  # Variance components
+  "Within-person" = "Within-person",
+  "Between-person" = "Between-person",
+  # Other
+  "(Intercept)" = "Intercept"
+)
+
 report_lmer_term <- function(
   model,
   term,
@@ -41,16 +94,27 @@ report_lmer_term <- function(
   if (p_method == "wald_z") {
     z <- est / se
     p <- 2 * stats::pnorm(abs(z), lower.tail = FALSE)
-    p_str <- paste0(", ", label_p, " = ", round(p, digits_p))
+    p_str <- paste0(
+      ", z = ",
+      round(z, digits_est),
+      ", ",
+      label_p,
+      " = ",
+      round(p, digits_p)
+    )
   }
 
   glue::glue(
-    "{round(est, digits_est)}, {round(level*100)}% CI [{round(ci[1], digits_ci)}, {round(ci[2], digits_ci)}]{p_str}"
+    "{round(est, digits_est)}, SE = {round(se, digits_est)}, ",
+    "{round(level*100)}% CI [{round(ci[1], digits_ci)}, {round(ci[2], digits_ci)}]{p_str}"
   )
 }
 
-# Extract and clean results from each model (within-person effects only)
-clean_results <- function(pooled_obj, window_name) {
+# Extract and clean results from each model (within-person effects only).
+# Set exponentiate = TRUE to report odds ratios rather than raw log-odds
+# coefficients (for the binary H2 outcome); the point estimate is then shown
+# to two decimal places on the odds-ratio scale.
+clean_results <- function(pooled_obj, window_name, exponentiate = FALSE) {
   summary(pooled_obj) |>
     as_tibble() |>
     filter(
@@ -58,17 +122,87 @@ clean_results <- function(pooled_obj, window_name) {
       term %in% c("game_ns_cw", "global_nf_cw")
     ) |>
     mutate(
+      # summary.mipo() returns `term` as a factor; index labels by the
+      # character value, not the factor's integer codes
+      term = as.character(term),
       term = ifelse(term %in% names(labels), labels[term], term)
     ) |>
     select(term, estimate, p.value) |>
     mutate(
+      point = if (exponentiate) {
+        scales::number(exp(estimate), 0.01)
+      } else {
+        as.character(round(estimate, 3))
+      },
       # Format as "Est (p)"
       result = glue(
-        "{round(estimate, 3)} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
+        "{point} ({ifelse(p.value < 0.001, '<.001', round(p.value, 3))})"
       ),
       window = window_name
     ) |>
     select(term, window, result)
+}
+
+# Pull a single pooled coefficient for inline reporting, formatted as a number.
+# Set exponentiate = TRUE for an odds ratio from a logistic model.
+pooled_coef <- function(pooled_obj, term_name, exponentiate = FALSE, accuracy = 0.01) {
+  est <- summary(pooled_obj) |>
+    as_tibble() |>
+    filter(term == term_name) |>
+    pull(estimate)
+
+  if (length(est) != 1) {
+    stop(glue("Term '{term_name}' not found (or not unique) in pooled summary"))
+  }
+
+  scales::number(if (exponentiate) exp(est) else est, accuracy)
+}
+
+# Mark a pre-formatted result string as an inline statistical readout, so it
+# typesets distinctly from prose (monospace, muted) in every output format.
+# Emits a Pandoc span carrying a class (.stat, styled in styles.css for HTML
+# and mapped to the #stat function for Typst via the preprint extension's
+# `functions` key) and a custom-style (the "Statistic" character style in the
+# docx reference doc). `label` prepends a leading symbol:
+# stat(h1_day_est, "B") -> '[B = 0.21, SE = ...]{.stat custom-style="Statistic"}'.
+stat <- function(x, label = NULL) {
+  body <- if (is.null(label)) as.character(x) else glue("{label} = {x}")
+  glue('[{body}]{{.stat custom-style="Statistic"}}')
+}
+
+# Format the estimate and p-value for one coefficient from a pooled model,
+# e.g. "B = 0.21, p < .001" or (exponentiate = TRUE) "OR = 0.91, p = .016".
+report_estimate_p <- function(
+  pooled_obj,
+  term_name,
+  exponentiate = FALSE,
+  lbl = if (exponentiate) "OR" else "B"
+) {
+  row <- summary(pooled_obj) |>
+    as_tibble() |>
+    filter(term == term_name)
+  est <- if (exponentiate) exp(row$estimate) else row$estimate
+  p <- row$p.value
+  p_str <- if (p < 0.001) "p < .001" else glue("p = {scales::number(p, .001)}")
+  glue("{lbl} = {scales::number(est, 0.01)}, {p_str}")
+}
+
+# One sentence-fragment comparing a coefficient across the primary,
+# >=15-survey subsample, and complete-case fits, for the sensitivity line
+# reported alongside each hypothesis test.
+report_sample_sensitivity <- function(
+  primary,
+  restricted,
+  cc,
+  term_name,
+  exponentiate = FALSE
+) {
+  f <- function(x) report_estimate_p(x, term_name, exponentiate)
+  glue(
+    "{f(primary)} in the primary sample; ",
+    "{f(restricted)} in the >=15-survey subsample; ",
+    "{f(cc)} for complete cases"
+  )
 }
 # Format helper functions
 format_mean_sd <- function(x) {
@@ -81,32 +215,27 @@ format_n_pct <- function(x, level) {
   sprintf("%d (%.1f%%)", n, pct)
 }
 
-# Function to create categorical breakdown
+# Build one categorical breakdown block for the participant table: a header
+# row plus one row per level. The "Primary sample" column covers every row of
+# `data`; the subsample column covers the rows flagged `data$in_subsample`
+# (participants with >=15 completed surveys).
 create_categorical_section <- function(data, var_name, header, levels) {
-  # Header row
   header_row <- tibble(
     Characteristic = header,
-    `Full sample` = "",
-    `Analytic sample` = ""
+    `Primary sample` = "",
+    `≥15-survey subsample` = ""
   )
 
-  # Level rows
   level_rows <- tibble(level = levels) |>
     mutate(
       Characteristic = glue("    {level}"),
-      `Full sample` = map_chr(
+      `Primary sample` = map_chr(
         level,
-        ~ format_n_pct(
-          data[[var_name]][data$sample == "Full eligible sample"],
-          .x
-        )
+        ~ format_n_pct(data[[var_name]], .x)
       ),
-      `Analytic sample` = map_chr(
+      `≥15-survey subsample` = map_chr(
         level,
-        ~ format_n_pct(
-          data[[var_name]][data$sample == "Analytic sample"],
-          .x
-        )
+        ~ format_n_pct(data[[var_name]][data$in_subsample], .x)
       )
     ) |>
     select(-level)
@@ -114,17 +243,52 @@ create_categorical_section <- function(data, var_name, header, levels) {
   bind_rows(header_row, level_rows)
 }
 
-# Report within-between estimates with consistent formatting
+# Report within-between estimates with consistent formatting.
+#
+# By default the estimate is reported on its native scale (a raw coefficient,
+# labelled "B" in the manuscript text). Set exponentiate = TRUE for a logistic
+# model to report an odds ratio instead: the point estimate and its 95% CI are
+# exponentiated (the CI bounds are the exp() of the Wald interval on the
+# log-odds scale) and the SE -- which is not meaningful on the odds-ratio
+# scale -- is omitted from the formatted string.
 report_wb_estimate <- function(
   pooled_summary,
   term_cw,
   term_cb = NULL,
-  accuracy = 0.01
+  accuracy = 0.01,
+  stat_label = "t",
+  exponentiate = FALSE
 ) {
-  # Helper to format p-values consistently
-
+  # p-value comparator phrase, to follow a bare "p": " < .001" or " = 0.016".
   format_p <- function(p) {
-    if (p < 0.001) "<.001" else as.character(round(p, 3))
+    if (p < 0.001) " < .001" else glue(" = {number(p, .001)}")
+  }
+
+  # Build the formatted result string for one coefficient row, on either the
+  # raw (B, with SE) or the exponentiated (OR, no SE) scale.
+  format_row <- function(row) {
+    p_str <- format_p(row$p.value)
+    ci_low <- row$estimate - 1.96 * row$std.error
+    ci_high <- row$estimate + 1.96 * row$std.error
+
+    if (exponentiate) {
+      glue(
+        "{number(exp(row$estimate), accuracy)} ",
+        "[95% CI: {number(exp(ci_low), accuracy)}, {number(exp(ci_high), accuracy)}], ",
+        "{stat_label} = {number(row$statistic, accuracy)}, p{p_str}"
+      )
+    } else {
+      glue(
+        "{number(row$estimate, accuracy)}, SE = {number(row$std.error, accuracy)}, ",
+        "[95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], ",
+        "{stat_label} = {number(row$statistic, accuracy)}, p{p_str}"
+      )
+    }
+  }
+
+  # Point estimate alone (odds ratio when exponentiate = TRUE), for interpretation
+  format_coef <- function(row) {
+    number(if (exponentiate) exp(row$estimate) else row$estimate, accuracy)
   }
 
   # Extract day-level estimate with CI and p-value
@@ -135,16 +299,7 @@ report_wb_estimate <- function(
     stop(glue("Term '{term_cw}' not found in pooled summary"))
   }
 
-  day_p <- format_p(day_level_row$p.value)
-  day_level <- day_level_row |>
-    mutate(
-      ci_low = estimate - 1.96 * std.error,
-      ci_high = estimate + 1.96 * std.error,
-      result = glue(
-        "{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], p = {day_p}"
-      )
-    ) |>
-    pull(result)
+  day_level <- format_row(day_level_row)
 
   # Optionally extract 30-day aggregate estimate
   if (!is.null(term_cb)) {
@@ -155,34 +310,17 @@ report_wb_estimate <- function(
       stop(glue("Term '{term_cb}' not found in pooled summary"))
     }
 
-    agg_p <- format_p(aggregate_row$p.value)
-    aggregate <- aggregate_row |>
-      mutate(
-        ci_low = estimate - 1.96 * std.error,
-        ci_high = estimate + 1.96 * std.error,
-        result = glue(
-          "{number(estimate, accuracy)} [95% CI: {number(ci_low, accuracy)}, {number(ci_high, accuracy)}], p = {agg_p}"
-        )
-      ) |>
-      pull(result)
-
-    # Also return just the coefficient for interpretation
-    day_coef <- number(day_level_row$estimate, accuracy)
-    agg_coef <- number(aggregate_row$estimate, accuracy)
-
     return(list(
       day_level = day_level,
-      aggregate = aggregate,
-      day_coef = day_coef,
-      agg_coef = agg_coef
+      aggregate = format_row(aggregate_row),
+      day_coef = format_coef(day_level_row),
+      agg_coef = format_coef(aggregate_row)
     ))
   }
 
-  day_coef <- number(day_level_row$estimate, accuracy)
-
   return(list(
     day_level = day_level,
-    day_coef = day_coef
+    day_coef = format_coef(day_level_row)
   ))
 }
 

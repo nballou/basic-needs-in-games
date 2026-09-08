@@ -1,0 +1,4 @@
+# Progress logs (categorize_activities_cache/ and categorize_activities_files/,
+# the sibling Quarto rendering artifacts in R/utils/, are already covered by
+# the root .gitignore's global *_cache/ and *_files/ patterns)
+_log/
