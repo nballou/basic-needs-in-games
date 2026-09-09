@@ -195,7 +195,7 @@ pws_n_sessions_fmt <- scales::comma(pws_n_sessions)
 
 # Introduction
 
-Upwards of half of adults and nearly all children in the UK and US regularly play video games [@EntertainmentSoftwareAssociation20242024; @Ofcom2023Online], affect the health of at least some users in important ways, both for better and for worse [@GranicEtAl2014benefits; @BallouEtAl2024How]. Media's effects on health are of interest to users, industry professionals, policymakers, clinicians, and families, but research has had limited success supporting these groups [@Ballou2023Manifesto]. Among other difficulties, progress has been stymied by three challenges: (1) tracking gaming behavior in sufficient detail, (2) measuring mental health with sufficient temporal resolution, and (3) aligning theory with growing evidence that effects relate primarily to the quality, rather than quantity, of play [@BallouDeterding2024Basic; @Buchi2024Digital; @Orben2022Digital].
+Upwards of half of adults and nearly all children in the UK and US regularly play video games [@EntertainmentSoftwareAssociation20242024; @Ofcom2023Online], affect the health of at least some users in important ways, both for better and for worse [@GranicEtAl2014benefits; @BallouEtAl2025How]. Media's effects on health are of interest to users, industry professionals, policymakers, clinicians, and families, but research has had limited success supporting these groups. Among other difficulties, progress has been stymied by three challenges: (1) tracking gaming behavior in sufficient detail, (2) measuring mental health with sufficient temporal resolution, and (3) aligning theory with growing evidence that effects relate primarily to the quality, rather than quantity, of play [@BallouDeterding2024Basic; @Buchi2024Digital; @Orben2022Digital].
 
 Digital trace data (automatically logged histories of user behavior) helps address these challenges. Compared to self-report, trace data provides greater detail about what, when and how much people play while alleviating concerns about recall biases [@ErnalaEtAl2020How; @KahnEtAl2014why; @ParryEtAl2021systematic]. However, three key limitations remain. First, while gaming companies collect player data at scale [@El-NasrEtAl2021Game], these data are rarely accessible to independent researchers. Where access has been negotiated or engineered via open source methods, it typically covers just one game or platform. While single-game studies can offer high depth and detail, they are potentially a small part of a person's gaming diet---engaged UK and US players use an average of 2.8 platforms [@BallouEtAl2025Perceived]. 
 
@@ -221,13 +221,13 @@ There has been substantial research into how games and other entertainment media
 
 The Basic Needs in Games (BANG) model of video game play and mental health [@BallouDeterding2024Basic] builds upon the core SDT principle that any action’s impact on mental health is mediated by the extent to which it satisfies or frustrates basic psychological needs. By differentiating between playtime and quality of play, BANG seeks to explain seemingly conflicting earlier findings that playtime itself is largely unrelated to wellbeing, but that some players do experience meaningful benefits or harms from their video game play. 
 
-To date, however, BANG remains largely untested. Hence, the goal of this study is to test several key BANG hypotheses. We label the hypotheses of the current study in numerical order (e.g., H1) but also provide the numbered label from the original paper (e.g., B6) for clarity of potential falsification.
+To date, however, BANG remains largely untested. Hence, the goal of this study is to test several key BANG hypotheses. We label the hypotheses of the current study in numerical order (e.g., H1) but also provide the numbered label from the original paper for clarity of potential falsification.
 
 ### The Relationship Between Basic Needs in Games and Global Basic Needs (H1)
 
 Following the hierarchical model of intrinsic and extrinsic motivation [@Vallerand1997Hierarchical], BANG conceives of basic needs as operating at three levels of generality: situational (a particular gaming session), contextual (gaming as a whole), and global (one’s life in general). Experiences at lower levels of generality feed into and co-constitute higher levels---experiences with games are one (greater or lesser) element of one's life overall. 
 
-A positive relationship between need satisfaction in games and overall need satisfaction is well-established in prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic; @BradtEtAl2024Are]. BANG (B6) formalizes this relationship, proposing that need satisfaction experienced during gaming sessions contributes to overall need satisfaction in life. Thus, BANG hypothesizes:
+A positive relationship between need satisfaction in games and overall need satisfaction is well-established in prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic; @BradtEtAl2024Are]. BANG Hypothesis 6 formalizes this relationship, proposing that need satisfaction experienced during gaming sessions contributes to overall need satisfaction in life:
 
 *H1. When individuals’ in-game needs are better satisfied, they report greater overall need satisfaction.*
 
@@ -235,13 +235,13 @@ A positive relationship between need satisfaction in games and overall need sati
 
 Early articulations of SDT propose that goal or activity selection is (intrinsically) motivated by the 'awareness of potential satisfaction' of basic psychological needs or 'expectations about the satisfaction of those [salient] motives' [@DeciRyan1985Intrinsic, p. 231--239]. Need-related outcome expectations are closely related to intrinsic motivation [perhaps even forming part of the computational machinery underlying motivation @MurayamaJach2023critique], and the behavioral product of these expectations is therefore greater behavioral engagement. 
 
-BANG proposes that experiences of need satisfaction during a particular gaming session positively affect players' expectations for future need satisfaction with the current game, similar games, and gaming as a whole. This prediction is grounded in reports that expected need frustration is reported to modulate both initial and continued gaming exposure [@BallouDeterding2023Just], and in broader findings that outcome expectations are a strong predictor of continued media engagement [@ChangEtAl2014effects; @KocakAlanEtAl2022Replaying; @LaroseEtAl2001Understanding]. From BANG (B8), we therefore derive the following hypothesis:
+BANG proposes that experiences of need satisfaction during a particular gaming session positively affect players' expectations for future need satisfaction with the current game, similar games, and gaming as a whole. This prediction is grounded in reports that expected need frustration is reported to modulate both initial and continued gaming exposure [@BallouDeterding2023Just], and in broader findings that outcome expectations are a strong predictor of continued media engagement [@ChangEtAl2014effects; @KocakAlanEtAl2022Replaying; @LaroseEtAl2001Understanding]. From BANG (Bang Hypothesis 8), we therefore derive the following hypothesis:
 
 *H2a. When individuals’ in-game need satisfaction is higher, they are more likely to play video games in the 24-hour period after survey completion.*
 
 ### Compensation (H2b)
 
-SDT predicts that (global) need frustration results in compensatory behavior---people attempt to replenish needs that are not being met by altering their behavior [e.g., @SheldonEtAl2011twoprocess]. The potent need satisfaction offered by games constitute one way for people to compensate, particularly those who are highly engaged with gaming and have high gaming literacy [@BallouEtAl2022People]. The  "need density hypothesis" predicts that problematic or disordered gaming is most likely to occur when a person experiences high need satisfaction in games and high need frustration in other life domains, leading to a negative feedback loop whereby compensation occurs but maladaptively diminishes the person's other compensatory tools besides gaming [@RigbyRyan2011glued]. Several studies have found support for the need density hypothesis account [@BradtEtAl2024Are; @AllenAnderson2018satisfaction; @MillsEtAl2018exploring]. 
+SDT predicts that (global) need frustration results in compensatory behavior---people attempt to replenish needs that are not being met by altering their behavior [e.g., @SheldonEtAl2011twoprocess]. The potent need satisfaction offered by games constitute one way for people to compensate, particularly those who are highly engaged with gaming and have high gaming literacy. The "need density hypothesis" predicts that problematic or disordered gaming is most likely to occur when a person experiences high need satisfaction in games and high need frustration in other life domains, leading to a negative feedback loop whereby compensation occurs but maladaptively diminishes the person's other compensatory tools besides gaming [@RigbyRyan2011glued]. Several studies have found support for the need density hypothesis account [@BradtEtAl2024Are; @AllenAnderson2018satisfaction; @MillsEtAl2018exploring]. 
 
 BANG operationalizes this compensatory play via intrinsic motivation. Frustrated needs in one’s life in general make opportunities to fulfill those needs more salient, which---all else equal---manifests phenomenologically as a stronger preference towards activities that satisfy the frustrated need(s). Given this, we hypothesize in the context of our sample of moderately to highly-engaged video game players (derived from BANG Hypothesis 9):
 
@@ -249,7 +249,7 @@ BANG operationalizes this compensatory play via intrinsic motivation. Frustrated
 
 ### Displacement (H3)
 
-Playtime, BANG argues, only becomes problematic when it displaces other activities essential to the maintenance of need satisfaction in life overall. Commonly proposed problematic displacements are work/school responsibilities [@DrummondSauer2020Timesplitters], personal relationships [@DomahidiEtAl2018Longitudinal], and physical health or sleep [@KingEtAl2013impact]. Displacing these essential activities would thereby reduce global need satisfaction. Thus, BANG (B5) hypothesizes:
+Playtime, BANG argues, only becomes problematic when it displaces other activities essential to the maintenance of need satisfaction in life overall. Commonly proposed problematic displacements are work/school responsibilities [@DrummondSauer2020Timesplitters], personal relationships [@DomahidiEtAl2018Longitudinal], and physical health or sleep [@KingEtAl2013impact]. Displacing these essential activities would thereby reduce global need satisfaction. Thus, BANG Hypothesis 5 states:
 
 *H3. When a person’s most recent gaming is reported to displace a core life domain (work/school, social engagements, sleep/eating/fitness, or caretaking), their global need satisfaction is lower.*
 
@@ -337,7 +337,7 @@ As specified in the Stage 1 Registered Report, sample size was determined by fea
 
 All eligibility and exclusion criteria were specified prior to data analysis in Stage 1 and/or documented as deviations in @tbl-deviations. Participants from the Open Play study were eligible for the current analysis if, further to the Open Play inclusion criteria, they resided in the U.S. and successfully linked at least one eligible account with validated recent digital trace data. 
 
-Following the preregistered plan, the primary analyses impute and analyse all eligible participants who completed at least one daily survey. Because imputing a near-complete diary series for participants who responded on only a handful of days is a strong assumption, we also report each hypothesis test on the subsample of participants who completed at least 15 surveys (>=50% of the diary period; @tbl-deviations, @tbl-s4-results) and on complete cases only.
+Following the preregistered plan, the primary analyses impute and analyze all eligible participants who completed at least one daily survey. Because imputing a near-complete diary series for participants who responded on only a handful of days is a strong assumption, we also report each hypothesis test on the subsample of participants who completed at least 15 surveys (>=50% of the diary period; @tbl-deviations, @tbl-s4-results) and on complete cases only.
 
 ### Participants
 
@@ -1627,7 +1627,7 @@ Our findings are not the first to report weak links between basic needs and gami
 
 ## Implications for the BANG model
 
-Only one of BANG's predictions was supported (H1/B6: game needs are positively associated with global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly. In-game positive experiences were unrelated to subsequent play (H2a), and self-reported displacement was negligibly related to wellbeing (H3). Global need frustration (H2b) was associated with a lower probability of subsequent play in the preregistered analysis, indicating no systematic compensatory gaming behavior. All in all, BANG hypotheses B5, B8, and B9 were unsupported in our data.
+Only one of BANG's predictions was supported (H1/B6: game needs are positively associated with global needs), consistent with prior literature [@AllenAnderson2018satisfaction; @BallouEtAl2024Basic] and the proposed hierarchical structure at the core of SDT [@Vallerand1997Hierarchical]. However, the behavioral predictions fared poorly. In-game positive experiences were unrelated to subsequent play (H2a), and self-reported displacement was negligibly related to wellbeing (H3). Global need frustration (H2b) was associated with a lower probability of subsequent play in the preregistered analysis, indicating no systematic compensatory gaming behavior. All in all, BANG Hypotheses 5, 8, and 9 were unsupported in our data.
 
 Null results for theoretical predictions can generally be attributed to (1) lack of statistical power, (2) validity issues (e.g., poor design, poor measures), (3) incorrect auxiliary hypotheses, or (4) theory failure [@Meehl1990Why]. We argue that our study is reasonably well-powered [see @BallouEtAl2025Psychological for simulated sensitivity analyses], and with the exception of H3 whose hypothetical displacement measure has obvious flaws (see Limitations), uses valid measures---in particular, because we observe real-world behavior. We endeavored to test the auxiliary hypothesis of correct timescale by comparing 6-hour, 12-hour, and 24-hour time periods, and by triangulating using the PowerWash Simulator dataset, wherein need-related experiences are captured within the session itself. However, none were able to find meaningful support for the behavioral predictions. 
 
@@ -1768,7 +1768,7 @@ tibble(
       "Unsupported; global need frustration was negatively related to the ",
       "probability of subsequent play in the preregistered analysis (opposite to the predicted direction) ",
       "(OR = {pooled_coef(h2_pooled, 'global_nf_cw', exponentiate = TRUE)}); the ",
-      "effect was negligible, and its significance was contingent on subsample/imputation strategy."
+      "relationship was negligible, and its significance was contingent on subsample/imputation strategy."
     ),
     "Unsupported; self-reported displacement of a core life domain was not associated with lower global need satisfaction."
   )
@@ -1999,10 +1999,6 @@ Results indicate that shorter windows post-survey are still unassociated with pl
 ### S2: Random effects specification robustness
 
 Random slopes allow associations to vary across individuals, which is theoretically appropriate for these constructs. The main analysis used a random intercept only model due to convergence issues in frequentist estimation. Here we test whether this simplification affects fixed effect estimates by comparing four specifications: (a) no random slopes (main model), (b) random slope for game NS within-person only, (c) random slope for global NF within-person only, and (d) both random slopes simultaneously using Bayesian estimation (which handles complex random effects more robustly). Because this analysis probes the random-effects structure rather than sample construction, and fitting random slopes over participants with only a few observed days is unstable, S2 is estimated on the >=15-survey subsample.
-
-
-
-
 
 ```{r}
 #| label: tbl-s2-specification-comparison
