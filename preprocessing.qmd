@@ -89,6 +89,11 @@ surveys <- read_csv(file.path(
   "data/clean/survey_daily.csv.gz"
 )) |>
   filter(pid %in% intake$pid)
+biweekly <- read_csv(
+  file.path(extract_dir, "data/clean/survey_biweekly.csv.gz"),
+  guess_max = 10000
+) |>
+  filter(pid %in% intake$pid)
 xbox <- read_csv(file.path(extract_dir, "data/clean/xbox.csv.gz"))
 nintendo <- read_csv(file.path(extract_dir, "data/clean/nintendo.csv.gz"))
 steam <- read_csv(
@@ -367,6 +372,56 @@ surveys <- surveys |>
     telemetry_played_any_24h_pre,
     play_minutes_24h_pre
   )
+```
+
+## Positive Control: Self-Reported vs Logged Play (Previous 2 Weeks)
+
+Preregistered positive control 1 pairs each biweekly survey's self-reported
+play over the previous 2 weeks (`self_reported_biweekly_play`, minutes) with
+digital trace playtime summed over the 14 days before the survey date.
+Restricted to the analytical sample; `window_covered` flags surveys whose
+full 14-day window falls within the participant's telemetry coverage. The
+correlation itself is computed in `index.qmd`.
+
+```{r}
+#| label: positive-control-biweekly
+#| code-summary: "Show code (Pair biweekly self-reported play with matched 14-day telemetry)"
+
+pos_control_biweekly <- biweekly |>
+  filter(
+    pid %in% unique(surveys$pid),
+    !is.na(self_reported_biweekly_play)
+  ) |>
+  transmute(
+    pid,
+    wave = as.factor(wave),
+    date = as.Date(date),
+    window_start = date - 14,
+    self_report_min = self_reported_biweekly_play
+  ) |>
+  left_join(
+    daily_telemetry,
+    by = join_by(pid, y$day_local >= x$window_start, y$day_local < x$date)
+  ) |>
+  summarise(
+    telemetry_min_14d = sum(minutes, na.rm = TRUE),
+    .by = c(pid, wave, date, self_report_min)
+  ) |>
+  left_join(
+    daily_telemetry |>
+      summarise(
+        tele_start = min(day_local),
+        tele_end = max(day_local),
+        .by = pid
+      ),
+    by = "pid"
+  ) |>
+  mutate(
+    window_covered = !is.na(tele_start) &
+      (date - 14) >= tele_start &
+      date <= tele_end + 1
+  ) |>
+  select(pid, wave, date, self_report_min, telemetry_min_14d, window_covered)
 ```
 
 ## Exported Objects

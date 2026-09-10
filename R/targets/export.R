@@ -13,12 +13,16 @@
 # activity classification (activity_label) for the H3 displaced-category
 # breakdown and the S9 by-domain models.
 # full_eligible_pids is NOT exported -- it is just unique(surveys$pid).
+# pos_control_biweekly is the preregistered positive-control pairing of
+# biweekly self-reported play with matched 14-day telemetry; the manuscript
+# computes the correlation from it.
 preprocessing_export_names <- c(
   "surveys",
   "intake",
   "hourly_telemetry",
   "daily_telemetry",
-  "activity_categories"
+  "activity_categories",
+  "pos_control_biweekly"
 )
 
 # imputation.qmd: MICE + within/between-person centering. Two imputations are

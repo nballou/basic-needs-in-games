@@ -146,6 +146,7 @@ tar_load(c(
   intake,
   hourly_telemetry,
   daily_telemetry,
+  pos_control_biweekly,
   activity_categories,
   dat,
   dat_desc,
@@ -822,10 +823,16 @@ tibble(
 #| label: positive-controls
 #| code-summary: "Show code (Test positive controls)"
 
-# Use first imputation for positive control check
+# Positive control 1: self-reported vs logged play over the previous 2 weeks
+# (biweekly survey self-report vs telemetry summed over the 14 days before the
+# survey), restricted to surveys with full telemetry coverage of the window.
+# One implausible self-report (> 14 days of play) is dropped.
+pc1_biweekly <- pos_control_biweekly |>
+  filter(window_covered, self_report_min <= 60 * 24 * 14)
+
 cor_playtime <- cor.test(
-  dat$self_reported_weekly_play[dat$.imp == 1],
-  dat$play_minutes_24h[dat$.imp == 1],
+  pc1_biweekly$self_report_min,
+  pc1_biweekly$telemetry_min_14d,
   method = "pearson"
 )
 
